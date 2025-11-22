@@ -670,3 +670,40 @@ func (r *MetricRepo) DeleteMonitorMetrics(ctx context.Context, monitorID string)
 		Where("monitor_id = ?", monitorID).
 		Delete(&models.MonitorMetric{}).Error
 }
+
+// DeleteAgentMetrics 删除指定探针的所有指标数据
+func (r *MetricRepo) DeleteAgentMetrics(ctx context.Context, agentID string) error {
+	tx := r.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// 删除各类指标数据
+	tables := []interface{}{
+		&models.CPUMetric{},
+		&models.MemoryMetric{},
+		&models.DiskMetric{},
+		&models.DiskIOMetric{},
+		&models.NetworkMetric{},
+		&models.LoadMetric{},
+		&models.HostMetric{},
+		&models.GPUMetric{},
+		&models.TemperatureMetric{},
+		&models.MonitorMetric{},
+	}
+
+	for _, table := range tables {
+		if err := tx.Where("agent_id = ?", agentID).Delete(table).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
+}

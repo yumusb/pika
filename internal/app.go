@@ -175,6 +175,7 @@ func setupApi(app *orz.App, components *AppComponents) {
 		adminApi.GET("/agents/:id", components.AgentHandler.GetForAdmin)
 		adminApi.PUT("/agents/:id/name", components.AgentHandler.UpdateName)
 		adminApi.PUT("/agents/:id", components.AgentHandler.UpdateInfo)
+		adminApi.DELETE("/agents/:id", components.AgentHandler.Delete)
 		adminApi.POST("/agents/:id/command", components.AgentHandler.SendCommand)
 
 		// VPS审计结果（管理员访问）

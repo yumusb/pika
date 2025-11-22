@@ -2,9 +2,10 @@ import {useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import type {ActionType, ProColumns} from '@ant-design/pro-components';
 import {ProTable} from '@ant-design/pro-components';
-import {App, Button, DatePicker, Divider, Form, Input, Modal, Space, Tag} from 'antd';
-import {Edit, Eye, RefreshCw, Plus, Shield} from 'lucide-react';
-import {getAgentPaging, updateAgentInfo} from '../../api/agent';
+import {App, Button, DatePicker, Divider, Dropdown, Form, Input, Modal, Space, Tag} from 'antd';
+import type {MenuProps} from 'antd';
+import {Edit, Eye, RefreshCw, Plus, Shield, Trash2, MoreVertical} from 'lucide-react';
+import {deleteAgent, getAgentPaging, updateAgentInfo} from '../../api/agent';
 import type {Agent} from '../../types';
 import {getErrorMessage} from '../../lib/utils';
 import dayjs from 'dayjs';
@@ -12,7 +13,7 @@ import {PageHeader} from '../../components';
 
 const AgentList = () => {
     const navigate = useNavigate();
-    const {message: messageApi} = App.useApp();
+    const {message: messageApi, modal} = App.useApp();
     const actionRef = useRef<ActionType>(null);
     const [form] = Form.useForm();
     const [editModalVisible, setEditModalVisible] = useState(false);
@@ -60,6 +61,34 @@ const AgentList = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // 删除探针
+    const handleDelete = (agent: Agent) => {
+        modal.confirm({
+            title: '删除探针',
+            content: (
+                <div>
+                    <p>确定要删除探针「{agent.name || agent.hostname}」吗？</p>
+                    <p className="text-red-500 text-sm mt-2">
+                        警告：此操作将删除探针及其所有相关数据（指标数据、监控统计、审计结果等），且不可恢复！
+                    </p>
+                </div>
+            ),
+            okText: '确认删除',
+            cancelText: '取消',
+            okButtonProps: {danger: true},
+            centered: true,
+            onOk: async () => {
+                try {
+                    await deleteAgent(agent.id);
+                    messageApi.success('探针删除成功');
+                    actionRef.current?.reload();
+                } catch (error: unknown) {
+                    messageApi.error(getErrorMessage(error, '删除探针失败'));
+                }
+            },
+        });
     };
 
     const columns: ProColumns<Agent>[] = [
@@ -168,37 +197,60 @@ const AgentList = () => {
             title: '操作',
             key: 'action',
             valueType: 'option',
-            width: 220,
+            width: 150,
             fixed: 'right',
-            render: (_, record) => (
-                <Space>
-                    <Button
-                        type="link"
-                        icon={<Shield size={14}/>}
-                        onClick={() => navigate(`/admin/agents/${record.id}?tab=audit`)}
-                        style={{padding: 0, margin: 0, color: '#1890ff'}}
-                        title="安全审计"
-                    >
-                        审计
-                    </Button>
-                    <Button
-                        type="link"
-                        icon={<Edit size={14}/>}
-                        onClick={() => handleEdit(record)}
-                        style={{padding: 0, margin: 0}}
-                    >
-                        编辑
-                    </Button>
-                    <Button
-                        type="link"
-                        icon={<Eye size={14}/>}
-                        onClick={() => navigate(`/admin/agents/${record.id}`)}
-                        style={{padding: 0, margin: 0}}
-                    >
-                        详情
-                    </Button>
-                </Space>
-            ),
+            render: (_, record) => {
+                const menuItems: MenuProps['items'] = [
+                    {
+                        key: 'view',
+                        label: '查看详情',
+                        icon: <Eye size={14}/>,
+                        onClick: () => navigate(`/admin/agents/${record.id}`),
+                    },
+                    {
+                        key: 'audit',
+                        label: '安全审计',
+                        icon: <Shield size={14}/>,
+                        onClick: () => navigate(`/admin/agents/${record.id}?tab=audit`),
+                    },
+                    {
+                        key: 'edit',
+                        label: '编辑信息',
+                        icon: <Edit size={14}/>,
+                        onClick: () => handleEdit(record),
+                    },
+                    {
+                        type: 'divider',
+                    },
+                    {
+                        key: 'delete',
+                        label: '删除探针',
+                        icon: <Trash2 size={14}/>,
+                        danger: true,
+                        onClick: () => handleDelete(record),
+                    },
+                ];
+
+                return (
+                    <Space size="small">
+                        <Button
+                            type="link"
+                            icon={<Eye size={14}/>}
+                            onClick={() => navigate(`/admin/agents/${record.id}`)}
+                            style={{padding: 0}}
+                        >
+                            详情
+                        </Button>
+                        <Dropdown menu={{items: menuItems}} trigger={['click']}>
+                            <Button
+                                type="link"
+                                icon={<MoreVertical size={14}/>}
+                                style={{padding: 0}}
+                            />
+                        </Dropdown>
+                    </Space>
+                );
+            },
         },
     ];
 

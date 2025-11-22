@@ -41,3 +41,9 @@ func (r *MonitorStatsRepo) DeleteByMonitorId(ctx context.Context, monitorId stri
 		Where("monitor_id = ?", monitorId).
 		Delete(&models.MonitorStats{}).Error
 }
+
+func (r *MonitorStatsRepo) DeleteByAgentId(ctx context.Context, agentId string) error {
+	return r.db.WithContext(ctx).
+		Where("agent_id = ?", agentId).
+		Delete(&models.MonitorStats{}).Error
+}

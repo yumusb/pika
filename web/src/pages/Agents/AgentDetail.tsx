@@ -122,10 +122,10 @@ const AgentDetail = () => {
         {
             key: 'info',
             label: (
-                <span className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-sm">
                     <Activity size={16}/>
-                    基本信息
-                </span>
+                    <div>基本信息</div>
+                </div>
             ),
             children: (
                 <Descriptions column={{xs: 1, sm: 2}} bordered>
@@ -186,13 +186,13 @@ const AgentDetail = () => {
         {
             key: 'audit',
             label: (
-                <span className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-sm">
                     <Shield size={16}/>
-                    安全审计
+                    <div>安全审计</div>
                     {auditResult && failCount > 0 && (
                         <Tag color="error" style={{marginLeft: 4}}>{failCount}</Tag>
                     )}
-                </span>
+                </div>
             ),
             children: (
                 <Space direction="vertical">

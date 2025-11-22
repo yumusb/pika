@@ -1,4 +1,4 @@
-import {get, post, put} from './request';
+import {del, get, post, put} from './request';
 import type {Agent, LatestMetrics} from '../types';
 
 export interface ListAgentsResponse {
@@ -214,4 +214,9 @@ export interface VersionInfo {
 
 export const getServerVersion = () => {
     return get<VersionInfo>('/agent/version');
+};
+
+// 删除探针
+export const deleteAgent = (agentId: string) => {
+    return del(`/admin/agents/${agentId}`);
 };

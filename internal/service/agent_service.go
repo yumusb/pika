@@ -9,23 +9,28 @@ import (
 	"github.com/dushixiang/pika/internal/models"
 	"github.com/dushixiang/pika/internal/protocol"
 	"github.com/dushixiang/pika/internal/repo"
+	"github.com/go-orz/orz"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
 type AgentService struct {
-	logger        *zap.Logger
-	AgentRepo     *repo.AgentRepo
-	metricRepo    *repo.MetricRepo
-	apiKeyService *ApiKeyService
+	logger *zap.Logger
+	*orz.Service
+	AgentRepo        *repo.AgentRepo
+	metricRepo       *repo.MetricRepo
+	monitorStatsRepo *repo.MonitorStatsRepo
+	apiKeyService    *ApiKeyService
 }
 
 func NewAgentService(logger *zap.Logger, db *gorm.DB, apiKeyService *ApiKeyService) *AgentService {
 	return &AgentService{
-		logger:        logger,
-		AgentRepo:     repo.NewAgentRepo(db),
-		metricRepo:    repo.NewMetricRepo(db),
-		apiKeyService: apiKeyService,
+		logger:           logger,
+		Service:          orz.NewService(db),
+		AgentRepo:        repo.NewAgentRepo(db),
+		metricRepo:       repo.NewMetricRepo(db),
+		monitorStatsRepo: repo.NewMonitorStatsRepo(db),
+		apiKeyService:    apiKeyService,
 	}
 }
 
@@ -737,4 +742,37 @@ func (s *AgentService) GetMonitorMetrics(ctx context.Context, agentID, monitorNa
 // GetMonitorMetricsByName 获取指定监控项的历史数据
 func (s *AgentService) GetMonitorMetricsByName(ctx context.Context, agentID, monitorName string, start, end int64, limit int) ([]models.MonitorMetric, error) {
 	return s.metricRepo.GetMonitorMetricsByName(ctx, agentID, monitorName, start, end, limit)
+}
+
+// DeleteAgent 删除探针及其所有相关数据
+func (s *AgentService) DeleteAgent(ctx context.Context, agentID string) error {
+	// 在事务中执行所有删除操作
+	return s.Transaction(ctx, func(ctx context.Context) error {
+		// 1. 删除探针的所有指标数据
+		if err := s.metricRepo.DeleteAgentMetrics(ctx, agentID); err != nil {
+			s.logger.Error("删除探针指标数据失败", zap.String("agentId", agentID), zap.Error(err))
+			return err
+		}
+
+		// 2. 删除探针的监控统计数据
+		if err := s.monitorStatsRepo.DeleteByAgentId(ctx, agentID); err != nil {
+			s.logger.Error("删除探针监控统计数据失败", zap.String("agentId", agentID), zap.Error(err))
+			return err
+		}
+
+		// 3. 删除探针的审计结果
+		if err := s.AgentRepo.DeleteAuditResults(ctx, agentID); err != nil {
+			s.logger.Error("删除探针审计结果失败", zap.String("agentId", agentID), zap.Error(err))
+			return err
+		}
+
+		// 4. 最后删除探针本身
+		if err := s.AgentRepo.DeleteById(ctx, agentID); err != nil {
+			s.logger.Error("删除探针失败", zap.String("agentId", agentID), zap.Error(err))
+			return err
+		}
+
+		s.logger.Info("探针删除成功", zap.String("agentId", agentID))
+		return nil
+	})
 }

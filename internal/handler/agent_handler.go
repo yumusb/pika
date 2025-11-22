@@ -94,8 +94,7 @@ func (h *AgentHandler) HandleWebSocket(c echo.Context) error {
 	}
 
 	// 注册探针 - 使用独立的context,不依赖HTTP请求的context
-	ctx := context.Background()
-	agent, err := h.agentService.RegisterAgent(ctx, c.RealIP(), &registerReq.AgentInfo, registerReq.ApiKey)
+	agent, err := h.agentService.RegisterAgent(context.Background(), c.RealIP(), &registerReq.AgentInfo, registerReq.ApiKey)
 	if err != nil {
 		h.logger.Error("failed to register agent", zap.Error(err))
 
@@ -107,7 +106,7 @@ func (h *AgentHandler) HandleWebSocket(c echo.Context) error {
 
 	defer func() {
 		// 设置探针状态为离线
-		_ = h.agentService.UpdateAgentStatus(ctx, agent.ID, 0)
+		_ = h.agentService.UpdateAgentStatus(context.Background(), agent.ID, 0)
 	}()
 
 	// 发送注册成功响应
@@ -130,8 +129,7 @@ func (h *AgentHandler) HandleWebSocket(c echo.Context) error {
 
 	// 启动读写协程
 	go client.WritePump()
-	go client.ReadPump(ctx)
-
+	client.ReadPump(context.Background())
 	return nil
 }
 
@@ -672,5 +670,39 @@ func (h *AgentHandler) GetLatestMonitorMetrics(c echo.Context) error {
 	return orz.Ok(c, orz.Map{
 		"agentId": agentID,
 		"metrics": metrics,
+	})
+}
+
+// Delete 删除探针
+func (h *AgentHandler) Delete(c echo.Context) error {
+	agentID := c.Param("id")
+	ctx := c.Request().Context()
+
+	// 检查探针是否存在
+	agent, err := h.agentService.GetAgent(ctx, agentID)
+	if err != nil {
+		return err
+	}
+
+	// 如果探针在线，先断开连接
+	if client, exists := h.wsManager.GetClient(agentID); exists {
+		client.Conn.Close()
+	}
+
+	// 删除探针及其所有相关数据
+	if err := h.agentService.DeleteAgent(ctx, agentID); err != nil {
+		h.logger.Error("删除探针失败",
+			zap.String("agentID", agentID),
+			zap.String("name", agent.Name),
+			zap.Error(err))
+		return err
+	}
+
+	h.logger.Info("探针已删除",
+		zap.String("agentID", agentID),
+		zap.String("name", agent.Name))
+
+	return orz.Ok(c, orz.Map{
+		"message": "删除成功",
 	})
 }

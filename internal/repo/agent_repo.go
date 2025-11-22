@@ -152,3 +152,10 @@ func (r *AgentRepo) ListByIDs(ctx context.Context, ids []string) ([]models.Agent
 		Find(&agents).Error
 	return agents, err
 }
+
+// DeleteAuditResults 删除探针的所有审计结果
+func (r *AgentRepo) DeleteAuditResults(ctx context.Context, agentID string) error {
+	return r.db.WithContext(ctx).
+		Where("agent_id = ?", agentID).
+		Delete(&models.AuditResult{}).Error
+}
