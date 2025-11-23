@@ -183,6 +183,29 @@ func (h *AgentHandler) handleWebSocketMessage(ctx context.Context, agentID strin
 		}
 		return h.tamperService.CreateAlert(agentID, alertData.Path, alertData.Details, alertData.Restored, alertData.Timestamp)
 
+	case protocol.MessageTypeTamperProtect:
+		// 防篡改配置响应
+		var protectResp protocol.TamperProtectResponse
+		if err := json.Unmarshal(data, &protectResp); err != nil {
+			h.logger.Error("failed to unmarshal tamper protect response", zap.Error(err))
+			return err
+		}
+		// 记录探针的配置应用结果
+		if protectResp.Success {
+			h.logger.Info("tamper protect config applied successfully",
+				zap.String("agentID", agentID),
+				zap.String("message", protectResp.Message),
+				zap.Int("current_paths", len(protectResp.Paths)),
+				zap.Int("added", len(protectResp.Added)),
+				zap.Int("removed", len(protectResp.Removed)))
+		} else {
+			h.logger.Error("tamper protect config apply failed",
+				zap.String("agentID", agentID),
+				zap.String("message", protectResp.Message),
+				zap.String("error", protectResp.Error))
+		}
+		return nil
+
 	default:
 		h.logger.Warn("unknown message type", zap.String("type", messageType))
 		return nil
