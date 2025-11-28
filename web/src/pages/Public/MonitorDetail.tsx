@@ -170,8 +170,8 @@ const UptimeBar = ({uptime}: { uptime: number }) => {
 
 const statThemes = {
     blue: {
-        icon: 'bg-blue-50 dark:bg-sky-900/30 text-blue-600 dark:text-sky-200',
-        accent: 'text-blue-600 dark:text-sky-200',
+        icon: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200',
+        accent: 'text-blue-600 dark:text-blue-200',
     },
     emerald: {
         icon: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-200',
@@ -274,8 +274,8 @@ const TimeRangeSelector = ({
                     onClick={() => onChange(option.value)}
                     className={`rounded-lg border px-3 py-1.5 text-sm transition ${
                         isActive
-                            ? 'border-sky-200 dark:border-sky-400 bg-sky-600 dark:bg-sky-500 text-white'
-                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-sky-200 dark:hover:border-sky-500 hover:text-sky-600 dark:hover:text-sky-200'
+                            ? 'border-blue-200 dark:border-blue-400 bg-blue-600 dark:bg-blue-500 text-white'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-blue-200 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-200'
                     }`}
                 >
                     {option.label}
@@ -394,7 +394,8 @@ const MonitorDetail = () => {
     const avgUptime24h = monitorStats.reduce((sum, s) => sum + s.uptime24h, 0) / monitorStats.length;
     const avgUptime30d = monitorStats.reduce((sum, s) => sum + s.uptime30d, 0) / monitorStats.length;
     const hasCert = firstStat.certExpiryDate > 0;
-    const certExpiringSoon = hasCert && firstStat.certExpiryDays < 30;
+    const certExpired = hasCert && firstStat.certExpiryDays < 0;
+    const certExpiringSoon = hasCert && firstStat.certExpiryDays >= 0 && firstStat.certExpiryDays < 30;
 
     const heroStats = [
         {label: '监控类型', value: firstStat.type.toUpperCase()},
@@ -495,19 +496,49 @@ const MonitorDetail = () => {
                         {/* 证书信息 */}
                         {hasCert && (
                             <div className={`mt-6 rounded-2xl border p-6 ${
-                                certExpiringSoon
-                                    ? 'border-amber-200 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10'
-                                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60'
+                                certExpired
+                                    ? 'border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10'
+                                    : certExpiringSoon
+                                        ? 'border-amber-200 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10'
+                                        : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60'
                             }`}>
                                 <div className="flex items-center gap-3">
-                                    <Shield className={`h-6 w-6 ${certExpiringSoon ? 'text-amber-600 dark:text-amber-200' : 'text-slate-600 dark:text-slate-400'}`}/>
+                                    <Shield className={`h-6 w-6 ${
+                                        certExpired
+                                            ? 'text-red-600 dark:text-red-200'
+                                            : certExpiringSoon
+                                                ? 'text-amber-600 dark:text-amber-200'
+                                                : 'text-slate-600 dark:text-slate-400'
+                                    }`}/>
                                     <div>
-                                        <h3 className={`text-lg font-semibold ${certExpiringSoon ? 'text-amber-900 dark:text-amber-100' : 'text-slate-900 dark:text-slate-50'}`}>
+                                        <h3 className={`text-lg font-semibold ${
+                                            certExpired
+                                                ? 'text-red-900 dark:text-red-100'
+                                                : certExpiringSoon
+                                                    ? 'text-amber-900 dark:text-amber-100'
+                                                    : 'text-slate-900 dark:text-slate-50'
+                                        }`}>
                                             TLS 证书信息
                                         </h3>
-                                        <p className={`mt-1 text-sm ${certExpiringSoon ? 'text-amber-700 dark:text-amber-200' : 'text-slate-600 dark:text-slate-400'}`}>
-                                            证书到期时间: {formatDate(firstStat.certExpiryDate)} (剩余 {firstStat.certExpiryDays} 天)
+                                        <p className={`mt-1 text-sm ${
+                                            certExpired
+                                                ? 'text-red-700 dark:text-red-200'
+                                                : certExpiringSoon
+                                                    ? 'text-amber-700 dark:text-amber-200'
+                                                    : 'text-slate-600 dark:text-slate-400'
+                                        }`}>
+                                            证书到期时间: {formatDate(firstStat.certExpiryDate)}
+                                            {certExpired ? (
+                                                <span className="ml-1">(已过期 {Math.abs(firstStat.certExpiryDays)} 天)</span>
+                                            ) : (
+                                                <span className="ml-1">(剩余 {firstStat.certExpiryDays} 天)</span>
+                                            )}
                                         </p>
+                                        {certExpired && (
+                                            <p className="mt-2 text-sm font-medium text-red-700 dark:text-red-200">
+                                                🚨 证书已过期，请立即更新
+                                            </p>
+                                        )}
                                         {certExpiringSoon && (
                                             <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-200">
                                                 ⚠️ 证书即将过期，请及时更新
@@ -530,7 +561,7 @@ const MonitorDetail = () => {
                                     <select
                                         value={selectedAgent}
                                         onChange={(e) => setSelectedAgent(e.target.value)}
-                                        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:border-sky-300 dark:hover:border-sky-500 focus:border-sky-500 dark:focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:focus:ring-sky-500/40"
+                                        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:border-blue-300 dark:hover:border-blue-500 focus:border-blue-500 dark:focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-500/40"
                                     >
                                         <option value="all">所有探针</option>
                                         {availableAgents.map((agent) => (

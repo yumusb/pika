@@ -106,7 +106,8 @@ const MonitorList = () => {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {monitorSummaries.map((stats) => {
                 const hasCert = stats.certExpiryDate > 0;
-                const certExpiringSoon = hasCert && stats.certExpiryDays < 30;
+                const certExpired = hasCert && stats.certExpiryDays < 0;
+                const certExpiringSoon = hasCert && stats.certExpiryDays >= 0 && stats.certExpiryDays < 30;
 
                 return (
                     <div
@@ -190,20 +191,44 @@ const MonitorList = () => {
 
                             {hasCert && (
                                 <div
-                                    className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/60 px-3 py-2.5">
+                                    className={`flex items-center justify-between rounded-lg border px-3 py-2.5 ${
+                                        certExpired
+                                            ? 'border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10'
+                                            : certExpiringSoon
+                                                ? 'border-yellow-200 dark:border-yellow-500/40 bg-yellow-50 dark:bg-yellow-500/10'
+                                                : 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/60'
+                                    }`}>
                                     <div className="flex items-center gap-2">
                                         <Shield
-                                            className={`h-4 w-4 ${certExpiringSoon ? 'text-yellow-600 dark:text-yellow-500' : 'text-blue-600 dark:text-blue-400'}`}/>
+                                            className={`h-4 w-4 ${
+                                                certExpired
+                                                    ? 'text-red-600 dark:text-red-400'
+                                                    : certExpiringSoon
+                                                        ? 'text-yellow-600 dark:text-yellow-500'
+                                                        : 'text-blue-600 dark:text-blue-400'
+                                            }`}/>
                                         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">证书到期</span>
                                     </div>
                                     <div className="text-right">
                                         <div
-                                            className={`text-xs font-medium ${certExpiringSoon ? 'text-yellow-700 dark:text-yellow-300' : 'text-slate-700 dark:text-slate-200'}`}>
+                                            className={`text-xs font-medium ${
+                                                certExpired
+                                                    ? 'text-red-700 dark:text-red-300'
+                                                    : certExpiringSoon
+                                                        ? 'text-yellow-700 dark:text-yellow-300'
+                                                        : 'text-slate-700 dark:text-slate-200'
+                                            }`}>
                                             {formatDate(stats.certExpiryDate)}
                                         </div>
                                         <div
-                                            className={`text-xs ${certExpiringSoon ? 'text-yellow-600 dark:text-yellow-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                                            剩余 {stats.certExpiryDays} 天
+                                            className={`text-xs ${
+                                                certExpired
+                                                    ? 'text-red-600 dark:text-red-400'
+                                                    : certExpiringSoon
+                                                        ? 'text-yellow-600 dark:text-yellow-400'
+                                                        : 'text-slate-500 dark:text-slate-400'
+                                            }`}>
+                                            {certExpired ? `已过期 ${Math.abs(stats.certExpiryDays)} 天` : `剩余 ${stats.certExpiryDays} 天`}
                                         </div>
                                     </div>
                                 </div>
@@ -234,7 +259,8 @@ const MonitorList = () => {
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-600 text-slate-700 dark:text-slate-200">
                     {monitorSummaries.map((stats) => {
                         const hasCert = stats.certExpiryDate > 0;
-                        const certExpiringSoon = hasCert && stats.certExpiryDays < 30;
+                        const certExpired = hasCert && stats.certExpiryDays < 0;
+                        const certExpiringSoon = hasCert && stats.certExpiryDays >= 0 && stats.certExpiryDays < 30;
 
                         return (
                             <tr
@@ -308,15 +334,33 @@ const MonitorList = () => {
                                     {hasCert ? (
                                         <div className="flex items-center gap-2">
                                             <Shield
-                                                className={`h-4 w-4 ${certExpiringSoon ? 'text-yellow-600 dark:text-yellow-500' : 'text-slate-400 dark:text-slate-500'}`}/>
+                                                className={`h-4 w-4 ${
+                                                    certExpired
+                                                        ? 'text-red-600 dark:text-red-400'
+                                                        : certExpiringSoon
+                                                            ? 'text-yellow-600 dark:text-yellow-500'
+                                                            : 'text-slate-400 dark:text-slate-500'
+                                                }`}/>
                                             <div className="text-xs">
                                                 <div
-                                                    className={certExpiringSoon ? 'font-medium text-yellow-700 dark:text-yellow-300' : 'font-medium text-slate-700 dark:text-slate-200'}>
+                                                    className={`font-medium ${
+                                                        certExpired
+                                                            ? 'text-red-700 dark:text-red-300'
+                                                            : certExpiringSoon
+                                                                ? 'text-yellow-700 dark:text-yellow-300'
+                                                                : 'text-slate-700 dark:text-slate-200'
+                                                    }`}>
                                                     {formatDate(stats.certExpiryDate)}
                                                 </div>
                                                 <div
-                                                    className={`${certExpiringSoon ? 'text-yellow-600 dark:text-yellow-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                    剩余 {stats.certExpiryDays} 天
+                                                    className={
+                                                        certExpired
+                                                            ? 'text-red-600 dark:text-red-400'
+                                                            : certExpiringSoon
+                                                                ? 'text-yellow-600 dark:text-yellow-400'
+                                                                : 'text-slate-500 dark:text-slate-400'
+                                                    }>
+                                                    {certExpired ? `已过期 ${Math.abs(stats.certExpiryDays)} 天` : `剩余 ${stats.certExpiryDays} 天`}
                                                 </div>
                                             </div>
                                         </div>

@@ -369,7 +369,7 @@ func (h *AgentHandler) GetMetrics(c echo.Context) error {
 
 	// 验证指标类型
 	validTypes := map[string]bool{
-		"cpu": true, "memory": true, "disk": true, "network": true, "load": true,
+		"cpu": true, "memory": true, "disk": true, "network": true, "network_connection": true, "load": true,
 		"disk_io": true, "gpu": true, "temperature": true,
 	}
 	if metricType == "" {

@@ -10,9 +10,7 @@ import (
 
 // NetworkCollector 网络监控采集器
 type NetworkCollector struct {
-	config        *config.Config                // 配置信息
-	lastStats     map[string]net.IOCountersStat // 上次采集的统计数据
-	lastCollectAt time.Time                     // 上次采集时间
+	config *config.Config // 配置信息
 }
 
 // safeDelta 计算网络计数器的增量,当出现重置或回绕时返回当前值避免溢出
@@ -21,7 +19,7 @@ func safeDelta(current, previous uint64) uint64 {
 		return current - previous
 	}
 	// 计数器被重置(例如接口重启)或发生回绕,只能依赖当前值
-	return current
+	return 0
 }
 
 // calcRate 根据增量和采样间隔计算每秒速率
@@ -35,30 +33,30 @@ func calcRate(delta uint64, intervalSeconds float64) uint64 {
 // NewNetworkCollector 创建网络采集器
 func NewNetworkCollector(cfg *config.Config) *NetworkCollector {
 	return &NetworkCollector{
-		config:    cfg,
-		lastStats: make(map[string]net.IOCountersStat),
+		config: cfg,
 	}
 }
 
-// Collect 采集网络数据(计算自上次采集以来的增量)
+// Collect 采集网络数据(间隔1秒采集两次计算速率)
 func (n *NetworkCollector) Collect() ([]protocol.NetworkData, error) {
-	now := time.Now()
-
-	// 计算距离上次采集的时间间隔(秒)
-	var intervalSeconds float64
-	if !n.lastCollectAt.IsZero() {
-		intervalSeconds = now.Sub(n.lastCollectAt).Seconds()
-	}
-
-	// 获取网络接口信息
-	interfaces, err := net.Interfaces()
+	// 第一次采集
+	firstCounters, _, err := n.collectOnce()
 	if err != nil {
 		return nil, err
 	}
 
-	// 创建接口信息映射
+	// 间隔1秒
+	time.Sleep(1 * time.Second)
+
+	// 第二次采集
+	secondCounters, secondInterfaces, err := n.collectOnce()
+	if err != nil {
+		return nil, err
+	}
+
+	// 创建接口信息映射(使用第二次采集的接口信息)
 	interfaceMap := make(map[string]*protocol.NetworkData)
-	for _, iface := range interfaces {
+	for _, iface := range secondInterfaces {
 		// 使用配置中的排除规则过滤网卡
 		if n.config.ShouldExcludeNetworkInterface(iface.Name) {
 			continue
@@ -77,14 +75,15 @@ func (n *NetworkCollector) Collect() ([]protocol.NetworkData, error) {
 		}
 	}
 
-	// 获取网络 IO 统计
-	ioCounters, err := net.IOCounters(true)
-	if err != nil {
-		return nil, err
+	// 创建第一次采集的统计数据映射
+	firstStatsMap := make(map[string]net.IOCountersStat)
+	for _, counter := range firstCounters {
+		firstStatsMap[counter.Name] = counter
 	}
 
+	// 计算速率(基于两次采集的差值)
 	var networkDataList []protocol.NetworkData
-	for _, counter := range ioCounters {
+	for _, counter := range secondCounters {
 		// 使用配置中的排除规则过滤网卡
 		if n.config.ShouldExcludeNetworkInterface(counter.Name) {
 			continue
@@ -98,29 +97,42 @@ func (n *NetworkCollector) Collect() ([]protocol.NetworkData, error) {
 			}
 		}
 
-		// 计算增量(如果是第一次采集,则使用当前值)
-		lastStat, exists := n.lastStats[counter.Name]
-		if exists {
-			bytesSentDelta := safeDelta(counter.BytesSent, lastStat.BytesSent)
-			bytesRecvDelta := safeDelta(counter.BytesRecv, lastStat.BytesRecv)
-			netData.BytesSentRate = calcRate(bytesSentDelta, intervalSeconds)
-			netData.BytesRecvRate = calcRate(bytesRecvDelta, intervalSeconds)
-		} else {
-			// 第一次采集无增量,速率保持为0
-			netData.BytesSentRate = 0
-			netData.BytesRecvRate = 0
-		}
+		// 使用第二次采集的总量
 		netData.BytesSentTotal = counter.BytesSent
 		netData.BytesRecvTotal = counter.BytesRecv
 
-		// 保存当前统计数据用于下次计算增量
-		n.lastStats[counter.Name] = counter
+		// 计算速率(如果第一次采集有数据)
+		if firstStat, exists := firstStatsMap[counter.Name]; exists {
+			bytesSentDelta := safeDelta(counter.BytesSent, firstStat.BytesSent)
+			bytesRecvDelta := safeDelta(counter.BytesRecv, firstStat.BytesRecv)
+			// 间隔固定为1秒
+			netData.BytesSentRate = bytesSentDelta
+			netData.BytesRecvRate = bytesRecvDelta
+		} else {
+			// 如果第一次采集没有该网卡数据,速率为0
+			netData.BytesSentRate = 0
+			netData.BytesRecvRate = 0
+		}
 
 		networkDataList = append(networkDataList, *netData)
 	}
 
-	// 更新采集时间
-	n.lastCollectAt = now
-
 	return networkDataList, nil
+}
+
+// collectOnce 执行一次网络数据采集
+func (n *NetworkCollector) collectOnce() ([]net.IOCountersStat, []net.InterfaceStat, error) {
+	// 获取网络接口信息
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 获取网络 IO 统计
+	ioCounters, err := net.IOCounters(true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ioCounters, interfaces, nil
 }

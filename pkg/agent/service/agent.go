@@ -476,6 +476,12 @@ func (a *Agent) collectAndSendAllMetrics(conn *safeConn, manager *collector.Mana
 		hasError = true
 	}
 
+	// 网络连接统计
+	if err := manager.CollectAndSendNetworkConnection(conn); err != nil {
+		log.Printf("⚠️  发送网络连接统计失败: %v", err)
+		hasError = true
+	}
+
 	// 系统负载指标
 	if err := manager.CollectAndSendLoad(conn); err != nil {
 		log.Printf("⚠️  发送负载指标失败: %v", err)

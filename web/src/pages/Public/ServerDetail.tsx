@@ -41,6 +41,7 @@ import type {
     AggregatedDiskMetric,
     AggregatedGPUMetric,
     AggregatedMemoryMetric,
+    AggregatedNetworkConnectionMetric,
     AggregatedNetworkMetric,
     AggregatedTemperatureMetric,
     LatestMetrics
@@ -118,7 +119,8 @@ const LoadingSpinner = () => (
 const EmptyState = ({message = '服务器不存在或已离线'}: { message?: string }) => (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-300">
+            <div
+                className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-300">
                 <Server className="h-8 w-8"/>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">{message}</p>
@@ -159,13 +161,16 @@ const Card = ({
     action?: ReactNode;
     children: ReactNode;
 }) => (
-    <section className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-6 shadow-sm">
+    <section
+        className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-6 shadow-sm">
         {(title || description || action) && (
             <div
                 className="flex flex-col gap-3 border-b border-slate-100 dark:border-slate-800 pb-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                    {title ? <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{title}</h2> : null}
-                    {description ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
+                    {title ?
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">{title}</h2> : null}
+                    {description ?
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p> : null}
                 </div>
                 {action ? <div className="shrink-0">{action}</div> : null}
             </div>
@@ -174,13 +179,13 @@ const Card = ({
     </section>
 );
 
-type AccentVariant = 'blue' | 'emerald' | 'purple' | 'sky' | 'amber';
+type AccentVariant = 'blue' | 'emerald' | 'purple' | 'amber';
 
 const accentThemes: Record<AccentVariant, { icon: string; badge: string; highlight: string }> = {
     blue: {
-        icon: 'bg-blue-50 dark:bg-sky-900/30 text-blue-600 dark:text-sky-200',
-        badge: 'bg-blue-100 dark:bg-sky-500/15 text-blue-600 dark:text-sky-200',
-        highlight: 'text-blue-600 dark:text-sky-200',
+        icon: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-200',
+        badge: 'bg-blue-100 dark:bg-blue-500/15 text-blue-600 dark:text-blue-200',
+        highlight: 'text-blue-600 dark:text-blue-200',
     },
     emerald: {
         icon: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-200',
@@ -191,11 +196,6 @@ const accentThemes: Record<AccentVariant, { icon: string; badge: string; highlig
         icon: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-200',
         badge: 'bg-purple-100 dark:bg-purple-500/15 text-purple-600 dark:text-purple-200',
         highlight: 'text-purple-600 dark:text-purple-200',
-    },
-    sky: {
-        icon: 'bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-200',
-        badge: 'bg-sky-100 dark:bg-sky-500/15 text-sky-600 dark:text-sky-200',
-        highlight: 'text-sky-600 dark:text-sky-200',
     },
     amber: {
         icon: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-200',
@@ -232,8 +232,8 @@ const TimeRangeSelector = ({
                     onClick={() => onChange(option.value)}
                     className={`rounded-lg border px-3 py-1.5 text-sm transition ${
                         isActive
-                            ? 'border-sky-200 dark:border-sky-400 bg-sky-600 dark:bg-sky-500 text-white'
-                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-sky-200 dark:hover:border-sky-500 hover:text-sky-600 dark:hover:text-sky-200'
+                            ? 'border-blue-200 dark:border-blue-400 bg-blue-600 dark:bg-blue-500 text-white'
+                            : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-blue-200 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-200'
                     }`}
                 >
                     {option.label}
@@ -249,6 +249,7 @@ type MetricsState = {
     cpu: AggregatedCPUMetric[];
     memory: AggregatedMemoryMetric[];
     network: AggregatedNetworkMetric[];
+    networkConnection: AggregatedNetworkConnectionMetric[];
     disk: AggregatedDiskMetric[];
     diskIO: AggregatedDiskIOMetric[];
     gpu: AggregatedGPUMetric[];
@@ -259,6 +260,7 @@ const createEmptyMetricsState = (): MetricsState => ({
     cpu: [],
     memory: [],
     network: [],
+    networkConnection: [],
     disk: [],
     diskIO: [],
     gpu: [],
@@ -269,6 +271,7 @@ const metricRequestConfig: Array<{ key: keyof MetricsState; type: GetAgentMetric
     {key: 'cpu', type: 'cpu'},
     {key: 'memory', type: 'memory'},
     {key: 'network', type: 'network'},
+    {key: 'networkConnection', type: 'network_connection'},
     {key: 'disk', type: 'disk'},
     {key: 'diskIO', type: 'disk_io'},
     {key: 'gpu', type: 'gpu'},
@@ -442,7 +445,8 @@ const SnapshotGrid = ({cards}: { cards: SnapshotCardData[] }) => (
                         {card.metrics.map((metric) => (
                             <div key={metric.label} className="flex items-center justify-between text-xs">
                                 <span className="text-slate-500 dark:text-slate-400">{metric.label}</span>
-                                <span className="ml-2 text-right font-medium text-slate-900 dark:text-slate-50">{metric.value}</span>
+                                <span
+                                    className="ml-2 text-right font-medium text-slate-900 dark:text-slate-50">{metric.value}</span>
                             </div>
                         ))}
                     </div>
@@ -460,7 +464,6 @@ const SnapshotSection = ({cards}: { cards: SnapshotCardData[] }) => {
         <div className="space-y-4">
             <div>
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">资源快照</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">最近 5 秒采集的资源使用状况</p>
             </div>
             <SnapshotGrid cards={cards}/>
         </div>
@@ -473,7 +476,8 @@ const CustomTooltip = ({active, payload, label, unit = '%'}: MetricsTooltipProps
     }
 
     return (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs shadow-sm dark:shadow-slate-950/50">
+        <div
+            className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs shadow-sm dark:shadow-slate-950/50">
             <p className="font-semibold text-slate-700 dark:text-slate-200">{label}</p>
             <div className="mt-1 space-y-1">
                 {payload.map((entry, index) => {
@@ -491,7 +495,8 @@ const CustomTooltip = ({active, payload, label, unit = '%'}: MetricsTooltipProps
                             : entry.value;
 
                     return (
-                        <p key={`${entry.dataKey ?? index}`} className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                        <p key={`${entry.dataKey ?? index}`}
+                           className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                         <span
                             className="inline-block h-2 w-2 rounded-full"
                             style={{backgroundColor: dotColor}}
@@ -888,14 +893,16 @@ const ServerDetail = () => {
                     <Card title="系统信息" description="探针基础属性、运行状态与资源概览">
                         <div className="space-y-6">
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-4">
+                                <div
+                                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-4">
                                     <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">运行环境</h3>
                                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">来自最近一次探针上报的硬件与系统信息</p>
                                     <div className="mt-4">
                                         <InfoGrid items={environmentInfo}/>
                                     </div>
                                 </div>
-                                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-4">
+                                <div
+                                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-4">
                                     <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">运行状态</h3>
                                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">关键时间与网络指标，帮助快速判断主机健康状况</p>
                                     <div className="mt-4">
@@ -903,6 +910,55 @@ const ServerDetail = () => {
                                     </div>
                                 </div>
                             </div>
+                            {latestMetrics?.networkConnection && (
+                                <div
+                                    className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 p-4">
+                                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">网络连接统计</h3>
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">TCP
+                                        连接各状态的实时统计数据</p>
+                                    <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                                        <div className="text-center">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">Total</div>
+                                            <div
+                                                className="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">{latestMetrics.networkConnection.total}</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">ESTABLISHED
+                                            </div>
+                                            <div
+                                                className="mt-1 text-lg font-semibold text-emerald-600 dark:text-emerald-400">{latestMetrics.networkConnection.established}</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">TIME_WAIT</div>
+                                            <div
+                                                className="mt-1 text-lg font-semibold text-amber-600 dark:text-amber-400">{latestMetrics.networkConnection.timeWait}</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">LISTEN</div>
+                                            <div
+                                                className="mt-1 text-lg font-semibold text-blue-600 dark:text-blue-400">{latestMetrics.networkConnection.listen}</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">CLOSE_WAIT</div>
+                                            <div
+                                                className="mt-1 text-lg font-semibold text-rose-600 dark:text-rose-400">{latestMetrics.networkConnection.closeWait}</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400">OTHER</div>
+                                            <div
+                                                className="mt-1 text-lg font-semibold text-slate-600 dark:text-slate-400">
+                                                {latestMetrics.networkConnection.synSent +
+                                                    latestMetrics.networkConnection.synRecv +
+                                                    latestMetrics.networkConnection.finWait1 +
+                                                    latestMetrics.networkConnection.finWait2 +
+                                                    latestMetrics.networkConnection.close +
+                                                    latestMetrics.networkConnection.lastAck +
+                                                    latestMetrics.networkConnection.closing}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <SnapshotSection cards={snapshotCards}/>
                         </div>
                     </Card>
@@ -930,7 +986,8 @@ const ServerDetail = () => {
                                                     <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
                                                 </linearGradient>
                                             </defs>
-                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4" className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
                                             <XAxis
                                                 dataKey="time"
                                                 stroke="currentColor"
@@ -978,7 +1035,8 @@ const ServerDetail = () => {
                                                     <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                                                 </linearGradient>
                                             </defs>
-                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4" className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
                                             <XAxis
                                                 dataKey="time"
                                                 stroke="currentColor"
@@ -1022,7 +1080,7 @@ const ServerDetail = () => {
                                         <select
                                             value={selectedInterface}
                                             onChange={(e) => setSelectedInterface(e.target.value)}
-                                            className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:border-sky-300 dark:hover:border-sky-500 focus:border-sky-500 dark:focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 dark:focus:ring-sky-500/40"
+                                            className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-200 hover:border-blue-300 dark:hover:border-blue-500 focus:border-blue-500 dark:focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-500/40"
                                         >
                                             <option value="all">所有网卡</option>
                                             {availableInterfaces.map((iface) => (
@@ -1036,7 +1094,8 @@ const ServerDetail = () => {
                                 {networkChartData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={220}>
                                         <LineChart data={networkChartData}>
-                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4" className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
                                             <XAxis
                                                 dataKey="time"
                                                 stroke="currentColor"
@@ -1099,7 +1158,8 @@ const ServerDetail = () => {
                                 {diskIOChartData.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={220}>
                                         <LineChart data={diskIOChartData}>
-                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4" className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
                                             <XAxis
                                                 dataKey="time"
                                                 stroke="currentColor"
@@ -1139,6 +1199,84 @@ const ServerDetail = () => {
                                 )}
                             </section>
 
+                            <section>
+                                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                    <span
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-100 dark:bg-cyan-900/40 text-cyan-600 dark:text-cyan-400">
+                                        <Network className="h-4 w-4"/>
+                                    </span>
+                                    网络连接统计
+                                </h3>
+                                {metricsData.networkConnection.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <LineChart data={metricsData.networkConnection.map(item => ({
+                                            time: new Date(item.timestamp).toLocaleTimeString('zh-CN', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                            }),
+                                            established: item.maxEstablished,
+                                            timeWait: item.maxTimeWait,
+                                            closeWait: item.maxCloseWait,
+                                            listen: item.maxListen,
+                                        }))}>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <XAxis
+                                                dataKey="time"
+                                                stroke="currentColor"
+                                                className="stroke-slate-400 dark:stroke-slate-500"
+                                                style={{fontSize: '12px'}}
+                                            />
+                                            <YAxis
+                                                stroke="currentColor"
+                                                className="stroke-slate-400 dark:stroke-slate-500"
+                                                style={{fontSize: '12px'}}
+                                            />
+                                            <Tooltip content={<CustomTooltip unit=""/>}/>
+                                            <Legend/>
+                                            <Line
+                                                type="monotone"
+                                                dataKey="established"
+                                                name="ESTABLISHED"
+                                                stroke="#10b981"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{r: 3}}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="timeWait"
+                                                name="TIME_WAIT"
+                                                stroke="#f59e0b"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{r: 3}}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="closeWait"
+                                                name="CLOSE_WAIT"
+                                                stroke="#ef4444"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{r: 3}}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="listen"
+                                                name="LISTEN"
+                                                stroke="#3b82f6"
+                                                strokeWidth={2}
+                                                dot={false}
+                                                activeDot={{r: 3}}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <ChartPlaceholder subtitle="暂无网络连接统计数据"/>
+                                )}
+                            </section>
+
                             {gpuChartData.length > 0 && (
                                 <section>
                                     <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -1150,7 +1288,8 @@ const ServerDetail = () => {
                                     </h3>
                                     <ResponsiveContainer width="100%" height={220}>
                                         <LineChart data={gpuChartData}>
-                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4" className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
                                             <XAxis
                                                 dataKey="time"
                                                 stroke="currentColor"
@@ -1216,7 +1355,8 @@ const ServerDetail = () => {
                                                     <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
                                                 </linearGradient>
                                             </defs>
-                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4" className="stroke-slate-200 dark:stroke-slate-600"/>
+                                            <CartesianGrid stroke="currentColor" strokeDasharray="4 4"
+                                                           className="stroke-slate-200 dark:stroke-slate-600"/>
                                             <XAxis
                                                 dataKey="time"
                                                 stroke="currentColor"

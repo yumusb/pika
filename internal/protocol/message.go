@@ -60,16 +60,17 @@ type MetricType string
 
 // 消息类型常量
 const (
-	MetricTypeCPU         MetricType = "cpu"
-	MetricTypeMemory      MetricType = "memory"
-	MetricTypeDisk        MetricType = "disk"
-	MetricTypeDiskIO      MetricType = "disk_io"
-	MetricTypeNetwork     MetricType = "network"
-	MetricTypeLoad        MetricType = "load"
-	MetricTypeHost        MetricType = "host"
-	MetricTypeGPU         MetricType = "gpu"
-	MetricTypeTemperature MetricType = "temperature"
-	MetricTypeMonitor     MetricType = "monitor"
+	MetricTypeCPU               MetricType = "cpu"
+	MetricTypeMemory            MetricType = "memory"
+	MetricTypeDisk              MetricType = "disk"
+	MetricTypeDiskIO            MetricType = "disk_io"
+	MetricTypeNetwork           MetricType = "network"
+	MetricTypeNetworkConnection MetricType = "network_connection"
+	MetricTypeLoad              MetricType = "load"
+	MetricTypeHost              MetricType = "host"
+	MetricTypeGPU               MetricType = "gpu"
+	MetricTypeTemperature       MetricType = "temperature"
+	MetricTypeMonitor           MetricType = "monitor"
 )
 
 // CPUData CPU数据
@@ -132,6 +133,22 @@ type NetworkData struct {
 	BytesRecvRate  uint64   `json:"bytesRecvRate"`  // 接收速率(字节/秒)
 	BytesSentTotal uint64   `json:"bytesSentTotal"` // 累计发送字节数
 	BytesRecvTotal uint64   `json:"bytesRecvTotal"` // 累计接收字节数
+}
+
+// NetworkConnectionData 网络连接统计数据
+type NetworkConnectionData struct {
+	Established uint32 `json:"established"` // ESTABLISHED 状态连接数
+	SynSent     uint32 `json:"synSent"`     // SYN_SENT 状态连接数
+	SynRecv     uint32 `json:"synRecv"`     // SYN_RECV 状态连接数
+	FinWait1    uint32 `json:"finWait1"`    // FIN_WAIT1 状态连接数
+	FinWait2    uint32 `json:"finWait2"`    // FIN_WAIT2 状态连接数
+	TimeWait    uint32 `json:"timeWait"`    // TIME_WAIT 状态连接数
+	Close       uint32 `json:"close"`       // CLOSE 状态连接数
+	CloseWait   uint32 `json:"closeWait"`   // CLOSE_WAIT 状态连接数
+	LastAck     uint32 `json:"lastAck"`     // LAST_ACK 状态连接数
+	Listen      uint32 `json:"listen"`      // LISTEN 状态连接数
+	Closing     uint32 `json:"closing"`     // CLOSING 状态连接数
+	Total       uint32 `json:"total"`       // 总连接数
 }
 
 // LoadData 系统负载数据

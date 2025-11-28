@@ -8,7 +8,7 @@ export interface ListAgentsResponse {
 
 export interface GetAgentMetricsRequest {
     agentId: string;
-    type: 'cpu' | 'memory' | 'disk' | 'network' | 'load' | 'disk_io' | 'gpu' | 'temperature';
+    type: 'cpu' | 'memory' | 'disk' | 'network' | 'network_connection' | 'load' | 'disk_io' | 'gpu' | 'temperature';
     range?: '1m' | '5m' | '15m' | '30m' | '1h';
 }
 

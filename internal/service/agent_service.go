@@ -223,6 +223,29 @@ func (s *AgentService) HandleMetricData(ctx context.Context, agentID string, met
 		}
 		return nil
 
+	case protocol.MetricTypeNetworkConnection:
+		var connData protocol.NetworkConnectionData
+		if err := json.Unmarshal(data, &connData); err != nil {
+			return err
+		}
+		metric := &models.NetworkConnectionMetric{
+			AgentID:     agentID,
+			Established: connData.Established,
+			SynSent:     connData.SynSent,
+			SynRecv:     connData.SynRecv,
+			FinWait1:    connData.FinWait1,
+			FinWait2:    connData.FinWait2,
+			TimeWait:    connData.TimeWait,
+			Close:       connData.Close,
+			CloseWait:   connData.CloseWait,
+			LastAck:     connData.LastAck,
+			Listen:      connData.Listen,
+			Closing:     connData.Closing,
+			Total:       connData.Total,
+			Timestamp:   now,
+		}
+		return s.metricRepo.SaveNetworkConnectionMetric(ctx, metric)
+
 	case protocol.MetricTypeLoad:
 		var loadData protocol.LoadData
 		if err := json.Unmarshal(data, &loadData); err != nil {
@@ -412,6 +435,8 @@ func (s *AgentService) GetMetrics(ctx context.Context, agentID, metricType strin
 		return s.metricRepo.GetDiskMetrics(ctx, agentID, start, end, interval)
 	case "network":
 		return s.metricRepo.GetNetworkMetrics(ctx, agentID, start, end, interval)
+	case "network_connection":
+		return s.metricRepo.GetNetworkConnectionMetrics(ctx, agentID, start, end, interval)
 	case "load":
 		return s.metricRepo.GetLoadMetrics(ctx, agentID, start, end, interval)
 	case "disk_io":
@@ -502,6 +527,11 @@ func (s *AgentService) GetLatestMetrics(ctx context.Context, agentID string) (*L
 		result.Temp = temp
 	}
 
+	// 获取最新网络连接统计
+	if netConn, err := s.metricRepo.GetLatestNetworkConnectionMetric(ctx, agentID); err == nil {
+		result.NetworkConnection = netConn
+	}
+
 	return result, nil
 }
 
@@ -558,14 +588,15 @@ type NetworkSummary struct {
 
 // LatestMetrics 最新指标数据（用于API响应）
 type LatestMetrics struct {
-	CPU     *models.CPUMetric          `json:"cpu,omitempty"`
-	Memory  *models.MemoryMetric       `json:"memory,omitempty"`
-	Disk    *DiskSummary               `json:"disk,omitempty"`
-	Network *NetworkSummary            `json:"network,omitempty"`
-	Load    *models.LoadMetric         `json:"load,omitempty"`
-	Host    *models.HostMetric         `json:"host,omitempty"`
-	GPU     []models.GPUMetric         `json:"gpu,omitempty"`
-	Temp    []models.TemperatureMetric `json:"temperature,omitempty"`
+	CPU               *models.CPUMetric               `json:"cpu,omitempty"`
+	Memory            *models.MemoryMetric            `json:"memory,omitempty"`
+	Disk              *DiskSummary                    `json:"disk,omitempty"`
+	Network           *NetworkSummary                 `json:"network,omitempty"`
+	NetworkConnection *models.NetworkConnectionMetric `json:"networkConnection,omitempty"`
+	Load              *models.LoadMetric              `json:"load,omitempty"`
+	Host              *models.HostMetric              `json:"host,omitempty"`
+	GPU               []models.GPUMetric              `json:"gpu,omitempty"`
+	Temp              []models.TemperatureMetric      `json:"temperature,omitempty"`
 }
 
 // HandleCommandResponse 处理指令响应

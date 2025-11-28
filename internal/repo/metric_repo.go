@@ -122,6 +122,74 @@ func (r *MetricRepo) GetLatestHostMetric(ctx context.Context, agentID string) (*
 	return &metric, nil
 }
 
+// SaveNetworkConnectionMetric 保存网络连接统计指标
+func (r *MetricRepo) SaveNetworkConnectionMetric(ctx context.Context, metric *models.NetworkConnectionMetric) error {
+	return r.db.WithContext(ctx).Create(metric).Error
+}
+
+// GetLatestNetworkConnectionMetric 获取最新的网络连接统计
+func (r *MetricRepo) GetLatestNetworkConnectionMetric(ctx context.Context, agentID string) (*models.NetworkConnectionMetric, error) {
+	var metric models.NetworkConnectionMetric
+	err := r.db.WithContext(ctx).
+		Where("agent_id = ?", agentID).
+		Order("timestamp DESC").
+		First(&metric).Error
+	if err != nil {
+		return nil, err
+	}
+	return &metric, nil
+}
+
+// AggregatedNetworkConnectionMetric 网络连接统计聚合指标
+type AggregatedNetworkConnectionMetric struct {
+	Timestamp      int64  `json:"timestamp"`
+	MaxEstablished uint32 `json:"maxEstablished"` // 最大已建立连接数
+	MaxSynSent     uint32 `json:"maxSynSent"`     // 最大 SYN_SENT 连接数
+	MaxSynRecv     uint32 `json:"maxSynRecv"`     // 最大 SYN_RECV 连接数
+	MaxFinWait1    uint32 `json:"maxFinWait1"`    // 最大 FIN_WAIT1 连接数
+	MaxFinWait2    uint32 `json:"maxFinWait2"`    // 最大 FIN_WAIT2 连接数
+	MaxTimeWait    uint32 `json:"maxTimeWait"`    // 最大 TIME_WAIT 连接数
+	MaxClose       uint32 `json:"maxClose"`       // 最大 CLOSE 连接数
+	MaxCloseWait   uint32 `json:"maxCloseWait"`   // 最大 CLOSE_WAIT 连接数
+	MaxLastAck     uint32 `json:"maxLastAck"`     // 最大 LAST_ACK 连接数
+	MaxListen      uint32 `json:"maxListen"`      // 最大 LISTEN 连接数
+	MaxClosing     uint32 `json:"maxClosing"`     // 最大 CLOSING 连接数
+	MaxTotal       uint32 `json:"maxTotal"`       // 最大总连接数
+}
+
+// GetNetworkConnectionMetrics 获取聚合后的网络连接统计指标
+func (r *MetricRepo) GetNetworkConnectionMetrics(ctx context.Context, agentID string, start, end int64, interval int) ([]AggregatedNetworkConnectionMetric, error) {
+	var metrics []AggregatedNetworkConnectionMetric
+
+	query := `
+		SELECT
+			CAST(FLOOR(timestamp / ?) * ? AS BIGINT) as timestamp,
+			MAX(established) as max_established,
+			MAX(syn_sent) as max_syn_sent,
+			MAX(syn_recv) as max_syn_recv,
+			MAX(fin_wait1) as max_fin_wait1,
+			MAX(fin_wait2) as max_fin_wait2,
+			MAX(time_wait) as max_time_wait,
+			MAX(close) as max_close,
+			MAX(close_wait) as max_close_wait,
+			MAX(last_ack) as max_last_ack,
+			MAX(listen) as max_listen,
+			MAX(closing) as max_closing,
+			MAX(total) as max_total
+		FROM network_connection_metrics
+		WHERE agent_id = ? AND timestamp >= ? AND timestamp <= ?
+		GROUP BY 1
+		ORDER BY timestamp ASC
+	`
+
+	intervalMs := int64(interval * 1000)
+	err := r.db.WithContext(ctx).
+		Raw(query, intervalMs, intervalMs, agentID, start, end).
+		Scan(&metrics).Error
+
+	return metrics, err
+}
+
 // DeleteOldMetrics 删除指定时间之前的所有指标数据
 func (r *MetricRepo) DeleteOldMetrics(ctx context.Context, beforeTimestamp int64) error {
 	// 批量大小
@@ -133,6 +201,7 @@ func (r *MetricRepo) DeleteOldMetrics(ctx context.Context, beforeTimestamp int64
 		&models.MemoryMetric{},
 		&models.DiskMetric{},
 		&models.NetworkMetric{},
+		&models.NetworkConnectionMetric{},
 		&models.LoadMetric{},
 		&models.DiskIOMetric{},
 		&models.GPUMetric{},

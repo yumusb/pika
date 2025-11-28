@@ -100,6 +100,22 @@ export interface AggregatedTemperatureMetric {
     maxTemperature: number;
 }
 
+export interface AggregatedNetworkConnectionMetric {
+    timestamp: number;
+    maxEstablished: number;
+    maxSynSent: number;
+    maxSynRecv: number;
+    maxFinWait1: number;
+    maxFinWait2: number;
+    maxTimeWait: number;
+    maxClose: number;
+    maxCloseWait: number;
+    maxLastAck: number;
+    maxListen: number;
+    maxClosing: number;
+    maxTotal: number;
+}
+
 // 最新实时数据（单点数据，不需要聚合）
 export interface CPUMetric {
     id: string;
@@ -364,11 +380,31 @@ export interface DiskIOMetric {
     timestamp: number;
 }
 
+// 网络连接统计
+export interface NetworkConnectionMetric {
+    id: number;
+    agentId: string;
+    established: number;  // ESTABLISHED 状态连接数
+    synSent: number;      // SYN_SENT 状态连接数
+    synRecv: number;      // SYN_RECV 状态连接数
+    finWait1: number;     // FIN_WAIT1 状态连接数
+    finWait2: number;     // FIN_WAIT2 状态连接数
+    timeWait: number;     // TIME_WAIT 状态连接数
+    close: number;        // CLOSE 状态连接数
+    closeWait: number;    // CLOSE_WAIT 状态连接数
+    lastAck: number;      // LAST_ACK 状态连接数
+    listen: number;       // LISTEN 状态连接数
+    closing: number;      // CLOSING 状态连接数
+    total: number;        // 总连接数
+    timestamp: number;
+}
+
 export interface LatestMetrics {
     cpu?: CPUMetric;
     memory?: MemoryMetric;
     disk?: DiskSummary;       // 改为汇总数据
     network?: NetworkSummary; // 改为汇总数据
+    networkConnection?: NetworkConnectionMetric; // 网络连接统计
     load?: LoadMetric;
     host?: HostMetric;        // 主机信息
     gpu?: GPUMetric[];        // GPU 列表

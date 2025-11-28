@@ -273,6 +273,7 @@ func autoMigrate(database *gorm.DB) error {
 		&models.MemoryMetric{},
 		&models.DiskMetric{},
 		&models.NetworkMetric{},
+		&models.NetworkConnectionMetric{},
 		&models.LoadMetric{},
 		&models.DiskIOMetric{},
 		&models.GPUMetric{},

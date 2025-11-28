@@ -3,7 +3,6 @@ package collector
 import (
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/dushixiang/pika/internal/protocol"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -127,65 +126,4 @@ func (d *DiskCollector) Collect() ([]protocol.DiskData, error) {
 	}
 
 	return diskDataList, nil
-}
-
-// DiskIOCollector 磁盘 IO 监控采集器
-type DiskIOCollector struct {
-	lastStats     map[string]disk.IOCountersStat // 上次采集的统计数据
-	lastCollectAt time.Time                      // 上次采集时间
-}
-
-// NewDiskIOCollector 创建磁盘 IO 采集器
-func NewDiskIOCollector() *DiskIOCollector {
-	return &DiskIOCollector{
-		lastStats: make(map[string]disk.IOCountersStat),
-	}
-}
-
-// Collect 采集磁盘 IO 数据(全部是动态数据,无需缓存)
-func (d *DiskIOCollector) Collect() ([]*protocol.DiskIOData, error) {
-	now := time.Now()
-
-	var intervalSeconds float64
-	if !d.lastCollectAt.IsZero() {
-		intervalSeconds = now.Sub(d.lastCollectAt).Seconds()
-	}
-
-	ioCounters, err := disk.IOCounters()
-	if err != nil {
-		return nil, err
-	}
-
-	var diskIODataList []*protocol.DiskIOData
-	for device, counter := range ioCounters {
-		diskIOData := &protocol.DiskIOData{
-			Device:         device,
-			ReadCount:      counter.ReadCount,
-			WriteCount:     counter.WriteCount,
-			ReadBytes:      counter.ReadBytes,
-			WriteBytes:     counter.WriteBytes,
-			ReadTime:       counter.ReadTime,
-			WriteTime:      counter.WriteTime,
-			IoTime:         counter.IoTime,
-			IopsInProgress: counter.IopsInProgress,
-		}
-
-		if last, exists := d.lastStats[device]; exists {
-			readBytesDelta := safeDelta(counter.ReadBytes, last.ReadBytes)
-			writeBytesDelta := safeDelta(counter.WriteBytes, last.WriteBytes)
-			diskIOData.ReadBytesRate = calcRate(readBytesDelta, intervalSeconds)
-			diskIOData.WriteBytesRate = calcRate(writeBytesDelta, intervalSeconds)
-		} else {
-			diskIOData.ReadBytesRate = 0
-			diskIOData.WriteBytesRate = 0
-		}
-
-		d.lastStats[device] = counter
-
-		diskIODataList = append(diskIODataList, diskIOData)
-	}
-
-	d.lastCollectAt = now
-
-	return diskIODataList, nil
 }

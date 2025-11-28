@@ -14,31 +14,33 @@ type WebSocketWriter interface {
 
 // Manager 采集器管理器
 type Manager struct {
-	cpuCollector         *CPUCollector
-	memoryCollector      *MemoryCollector
-	diskCollector        *DiskCollector
-	diskIOCollector      *DiskIOCollector
-	networkCollector     *NetworkCollector
-	loadCollector        *LoadCollector
-	hostCollector        *HostCollector
-	temperatureCollector *TemperatureCollector
-	gpuCollector         *GPUCollector
-	monitorCollector     *MonitorCollector
+	cpuCollector               *CPUCollector
+	memoryCollector            *MemoryCollector
+	diskCollector              *DiskCollector
+	diskIOCollector            *DiskIOCollector
+	networkCollector           *NetworkCollector
+	networkConnectionCollector *NetworkConnectionCollector
+	loadCollector              *LoadCollector
+	hostCollector              *HostCollector
+	temperatureCollector       *TemperatureCollector
+	gpuCollector               *GPUCollector
+	monitorCollector           *MonitorCollector
 }
 
 // NewManager 创建采集器管理器
 func NewManager(cfg *config.Config) *Manager {
 	return &Manager{
-		cpuCollector:         NewCPUCollector(),
-		memoryCollector:      NewMemoryCollector(),
-		diskCollector:        NewDiskCollector(),
-		diskIOCollector:      NewDiskIOCollector(),
-		networkCollector:     NewNetworkCollector(cfg),
-		loadCollector:        NewLoadCollector(),
-		hostCollector:        NewHostCollector(),
-		temperatureCollector: NewTemperatureCollector(),
-		gpuCollector:         NewGPUCollector(),
-		monitorCollector:     NewMonitorCollector(),
+		cpuCollector:               NewCPUCollector(),
+		memoryCollector:            NewMemoryCollector(),
+		diskCollector:              NewDiskCollector(),
+		diskIOCollector:            NewDiskIOCollector(),
+		networkCollector:           NewNetworkCollector(cfg),
+		networkConnectionCollector: NewNetworkConnectionCollector(),
+		loadCollector:              NewLoadCollector(),
+		hostCollector:              NewHostCollector(),
+		temperatureCollector:       NewTemperatureCollector(),
+		gpuCollector:               NewGPUCollector(),
+		monitorCollector:           NewMonitorCollector(),
 	}
 }
 
@@ -87,6 +89,15 @@ func (m *Manager) CollectAndSendNetwork(conn WebSocketWriter) error {
 		return err
 	}
 	return m.sendMetrics(conn, protocol.MetricTypeNetwork, networkDataList)
+}
+
+// CollectAndSendNetworkConnection 采集并发送网络连接统计
+func (m *Manager) CollectAndSendNetworkConnection(conn WebSocketWriter) error {
+	connectionData, err := m.networkConnectionCollector.Collect()
+	if err != nil {
+		return err
+	}
+	return m.sendMetrics(conn, protocol.MetricTypeNetworkConnection, connectionData)
 }
 
 // CollectAndSendLoad 采集并发送系统负载指标

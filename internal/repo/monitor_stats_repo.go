@@ -47,3 +47,20 @@ func (r *MonitorStatsRepo) DeleteByAgentId(ctx context.Context, agentId string) 
 		Where("agent_id = ?", agentId).
 		Delete(&models.MonitorStats{}).Error
 }
+
+// FindAll 查找所有统计数据
+func (r *MonitorStatsRepo) FindAll(ctx context.Context) ([]models.MonitorStats, error) {
+	var statsList []models.MonitorStats
+	err := r.db.WithContext(ctx).Find(&statsList).Error
+	return statsList, err
+}
+
+// DeleteByIDs 批量删除指定ID的统计数据
+func (r *MonitorStatsRepo) DeleteByIDs(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).
+		Where("id IN ?", ids).
+		Delete(&models.MonitorStats{}).Error
+}

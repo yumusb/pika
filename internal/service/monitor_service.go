@@ -176,60 +176,111 @@ func (s *MonitorService) DeleteMonitor(ctx context.Context, id string) error {
 
 // ListByAuth 返回公开展示所需的监控配置和汇总统计
 func (s *MonitorService) ListByAuth(ctx context.Context, isAuthenticated bool) ([]PublicMonitorOverview, error) {
+	// 获取符合权限的监控任务列表
 	monitors, err := s.FindByAuth(ctx, isAuthenticated)
 	if err != nil {
 		return nil, err
 	}
+
+	if len(monitors) == 0 {
+		return []PublicMonitorOverview{}, nil
+	}
+
+	// 提取监控任务ID列表
 	monitorIds := make([]string, 0, len(monitors))
 	for _, monitor := range monitors {
 		monitorIds = append(monitorIds, monitor.ID)
 	}
 
+	// 批量获取统计数据
 	statsList, err := s.monitorStatsRepo.FindByMonitorIdIn(ctx, monitorIds)
 	if err != nil {
 		return nil, err
 	}
 
+	// 按监控任务ID分组统计数据
 	statsMap := make(map[string][]models.MonitorStats, len(monitors))
 	for _, stats := range statsList {
 		statsMap[stats.MonitorId] = append(statsMap[stats.MonitorId], stats)
 	}
 
+	// 获取所有探针列表，用于过滤有效的统计数据
+	agents, err := s.agentRepo.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建监控概览列表
 	items := make([]PublicMonitorOverview, 0, len(monitors))
 	for _, monitor := range monitors {
-		summary := aggregateMonitorStats(statsMap[monitor.ID])
+		// 计算当前监控任务关联的目标探针
+		targetAgents := s.resolveTargetAgents(monitor, agents)
 
-		// 根据 ShowTargetPublic 字段决定是否返回真实的 Target
-		target := monitor.Target
-		if !monitor.ShowTargetPublic {
-			target = "******"
-		}
+		// 过滤出目标探针的统计数据
+		filteredStats := s.filterStatsByAgents(statsMap[monitor.ID], targetAgents)
 
-		item := PublicMonitorOverview{
-			ID:               monitor.ID,
-			Name:             monitor.Name,
-			Type:             monitor.Type,
-			Target:           target,
-			ShowTargetPublic: monitor.ShowTargetPublic,
-			Description:      monitor.Description,
-			Enabled:          monitor.Enabled,
-			Interval:         monitor.Interval,
-			AgentIds:         cloneAgentIDs(monitor.AgentIds),
-			AgentCount:       summary.AgentCount,
-			LastCheckStatus:  summary.LastCheckStatus,
-			CurrentResponse:  summary.CurrentResponse,
-			AvgResponse24h:   summary.AvgResponse24h,
-			Uptime24h:        summary.Uptime24h,
-			Uptime30d:        summary.Uptime30d,
-			CertExpiryDate:   summary.CertExpiryDate,
-			CertExpiryDays:   summary.CertExpiryDays,
-			LastCheckTime:    summary.LastCheckTime,
-		}
+		// 聚合统计数据
+		summary := aggregateMonitorStats(filteredStats)
 
+		// 构建监控概览对象
+		item := s.buildMonitorOverview(monitor, summary)
 		items = append(items, item)
 	}
 
 	return items, nil
+}
+
+// filterStatsByAgents 过滤出指定探针的统计数据
+func (s *MonitorService) filterStatsByAgents(stats []models.MonitorStats, targetAgents []models.Agent) []models.MonitorStats {
+	if len(stats) == 0 || len(targetAgents) == 0 {
+		return []models.MonitorStats{}
+	}
+
+	// 构建目标探针ID映射
+	targetAgentsMap := make(map[string]bool, len(targetAgents))
+	for _, agent := range targetAgents {
+		targetAgentsMap[agent.ID] = true
+	}
+
+	// 过滤统计数据
+	filteredStats := make([]models.MonitorStats, 0, len(stats))
+	for _, stat := range stats {
+		if targetAgentsMap[stat.AgentID] {
+			filteredStats = append(filteredStats, stat)
+		}
+	}
+
+	return filteredStats
+}
+
+// buildMonitorOverview 构建监控概览对象
+func (s *MonitorService) buildMonitorOverview(monitor models.MonitorTask, summary monitorOverviewSummary) PublicMonitorOverview {
+	// 根据 ShowTargetPublic 字段决定是否返回真实的 Target
+	target := monitor.Target
+	if !monitor.ShowTargetPublic {
+		target = "******"
+	}
+
+	return PublicMonitorOverview{
+		ID:               monitor.ID,
+		Name:             monitor.Name,
+		Type:             monitor.Type,
+		Target:           target,
+		ShowTargetPublic: monitor.ShowTargetPublic,
+		Description:      monitor.Description,
+		Enabled:          monitor.Enabled,
+		Interval:         monitor.Interval,
+		AgentIds:         cloneAgentIDs(monitor.AgentIds),
+		AgentCount:       summary.AgentCount,
+		LastCheckStatus:  summary.LastCheckStatus,
+		CurrentResponse:  summary.CurrentResponse,
+		AvgResponse24h:   summary.AvgResponse24h,
+		Uptime24h:        summary.Uptime24h,
+		Uptime30d:        summary.Uptime30d,
+		CertExpiryDate:   summary.CertExpiryDate,
+		CertExpiryDays:   summary.CertExpiryDays,
+		LastCheckTime:    summary.LastCheckTime,
+	}
 }
 
 type monitorOverviewSummary struct {
@@ -471,18 +522,19 @@ func (s *MonitorService) CalculateMonitorStats(ctx context.Context) error {
 	now := time.Now()
 
 	// 获取所有启用的监控任务
-	var monitors []models.MonitorTask
-	if err := s.MonitorRepo.GetDB(ctx).
-		Where("enabled = ?", true).
-		Find(&monitors).Error; err != nil {
-		return err
-	}
-
-	// 获取所有在线探针
-	agents, err := s.agentRepo.FindOnlineAgents(ctx)
+	monitors, err := s.MonitorRepo.FindByEnabled(ctx, true)
 	if err != nil {
 		return err
 	}
+
+	// 获取所有探针（包括在线和离线）
+	agents, err := s.agentRepo.FindAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	// 收集所有有效的统计数据ID（应该保留的）
+	validStatsIDs := make(map[string]bool)
 
 	// 为每个监控任务的每个探针计算统计数据
 	for _, monitor := range monitors {
@@ -499,6 +551,9 @@ func (s *MonitorService) CalculateMonitorStats(ctx context.Context) error {
 				continue
 			}
 
+			// 记录有效的统计ID
+			validStatsIDs[stats.ID] = true
+
 			if err := s.monitorStatsRepo.Save(ctx, stats); err != nil {
 				s.logger.Error("保存监控统计失败",
 					zap.String("agentID", agent.ID),
@@ -506,6 +561,12 @@ func (s *MonitorService) CalculateMonitorStats(ctx context.Context) error {
 					zap.Error(err))
 			}
 		}
+	}
+
+	// 清理无效的统计数据（不在有效列表中的）
+	if err := s.cleanupInvalidStats(ctx, validStatsIDs); err != nil {
+		s.logger.Error("清理无效统计数据失败", zap.Error(err))
+		// 不返回错误，继续运行
 	}
 
 	return nil
@@ -691,4 +752,32 @@ func (s *MonitorService) GetMonitorByAuth(ctx context.Context, id string, isAuth
 		return nil, fmt.Errorf("monitor is disabled")
 	}
 	return monitor, nil
+}
+
+// cleanupInvalidStats 清理无效的统计数据
+// 删除不在有效ID列表中的统计数据（说明对应的监控任务已禁用/删除，或探针已不在目标范围内）
+func (s *MonitorService) cleanupInvalidStats(ctx context.Context, validStatsIDs map[string]bool) error {
+	// 获取所有现有的统计数据
+	allStats, err := s.monitorStatsRepo.FindAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	// 收集需要删除的统计数据ID
+	idsToDelete := make([]string, 0)
+	for _, stats := range allStats {
+		if !validStatsIDs[stats.ID] {
+			idsToDelete = append(idsToDelete, stats.ID)
+		}
+	}
+
+	// 批量删除无效的统计数据
+	if len(idsToDelete) > 0 {
+		s.logger.Info("清理无效的监控统计数据", zap.Int("count", len(idsToDelete)))
+		if err := s.monitorStatsRepo.DeleteByIDs(ctx, idsToDelete); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

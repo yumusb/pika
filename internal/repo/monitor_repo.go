@@ -32,19 +32,18 @@ func (r *MonitorRepo) FindByEnabledAndAgentId(ctx context.Context, agentId strin
 
 func (r *MonitorRepo) FindByAuth(ctx context.Context, isAuthenticated bool) ([]models.MonitorTask, error) {
 	var monitors []models.MonitorTask
-	if err := r.GetDB(ctx).
-		Where("enabled = ?", true).
-		Order("name ASC").
-		Find(&monitors).Error; err != nil {
+	query := r.GetDB(ctx).Where("enabled = ?", true)
+
+	// 如果未登录，只查询公开可见的监控任务
+	if !isAuthenticated {
+		query = query.Where("visibility = ?", "public")
+	}
+
+	if err := query.Order("name ASC").Find(&monitors).Error; err != nil {
 		return nil, err
 	}
-	var filteredMonitors []models.MonitorTask
-	for _, monitor := range monitors {
-		if isAuthenticated || monitor.Visibility == "public" {
-			filteredMonitors = append(filteredMonitors, monitor)
-		}
-	}
-	return filteredMonitors, nil
+
+	return monitors, nil
 }
 
 // FindPublicMonitorByID 查找指定ID的公开可见监控任务
@@ -57,4 +56,15 @@ func (r *MonitorRepo) FindPublicMonitorByID(ctx context.Context, id string) (*mo
 		return nil, err
 	}
 	return &task, nil
+}
+
+// FindByEnabled 查找所有启用的监控任务
+func (r *MonitorRepo) FindByEnabled(ctx context.Context, enabled bool) ([]models.MonitorTask, error) {
+	var monitors []models.MonitorTask
+	if err := r.GetDB(ctx).
+		Where("enabled = ?", enabled).
+		Find(&monitors).Error; err != nil {
+		return nil, err
+	}
+	return monitors, nil
 }

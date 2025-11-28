@@ -536,13 +536,6 @@ func registerAgent(cmd *cobra.Command, args []string) {
 	log.Println("   🎉 探针注册完成！")
 	log.Println("═══════════════════════════════════════")
 	log.Println()
-	log.Println("📌 常用命令:")
-	log.Println("   查看状态: agent status")
-	log.Println("   停止服务: agent stop")
-	log.Println("   启动服务: agent start")
-	log.Println("   重启服务: agent restart")
-	log.Println("   卸载服务: agent uninstall")
-	log.Println()
 }
 
 // maskToken 对 Token 进行部分遮蔽显示
