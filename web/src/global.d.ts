@@ -6,6 +6,7 @@ declare global {
             SystemNameZh: string;
             SystemNameEn: string;
             ICPCode: string;
+            DefaultView: string;
         };
     }
 }

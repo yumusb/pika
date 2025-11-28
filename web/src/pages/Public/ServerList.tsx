@@ -10,8 +10,6 @@ interface AgentWithMetrics extends Agent {
     metrics?: LatestMetrics;
 }
 
-type ViewMode = 'grid' | 'list';
-
 const formatSpeed = (bytesPerSecond: number): string => {
     if (!bytesPerSecond || bytesPerSecond <= 0) return '0 B/s';
     const k = 1024;

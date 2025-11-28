@@ -46,4 +46,5 @@ type SystemConfig struct {
 	SystemNameEn string `json:"systemNameEn"` // 系统名称（英文）
 	LogoBase64   string `json:"logoBase64"`   // 系统logo（base64编码）
 	ICPCode      string `json:"icpCode"`      // ICP备案号
+	DefaultView  string `json:"defaultView"`  // 默认视图 grid | list
 }

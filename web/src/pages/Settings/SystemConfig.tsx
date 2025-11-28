@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
-import {App, Button, Card, Form, Input, Space, Spin, Upload} from 'antd';
-import {Upload as UploadIcon} from 'lucide-react';
+import {App, Button, Card, Form, Input, Radio, Space, Spin, Upload} from 'antd';
+import {Upload as UploadIcon, Grid3x3, List} from 'lucide-react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import type {SystemConfig} from '../../api/system-config';
 import {getSystemConfig, saveSystemConfig} from '../../api/system-config';
@@ -41,6 +41,7 @@ const SystemConfigComponent = () => {
                 systemNameEn: config.systemNameEn,
                 systemNameZh: config.systemNameZh,
                 icpCode: config.icpCode,
+                defaultView: config.defaultView ?? true, // 默认为 grid 视图
             });
             if (config.logoBase64) {
                 setLogoPreview(config.logoBase64);
@@ -97,6 +98,7 @@ const SystemConfigComponent = () => {
                 systemNameZh: values.systemNameZh,
                 logoBase64: logoPreview,
                 icpCode: values.icpCode || '',
+                defaultView: values.defaultView ?? true,
             } as SystemConfig);
         } catch (error) {
             // 表单验证失败
@@ -110,6 +112,7 @@ const SystemConfigComponent = () => {
                 systemNameEn: config.systemNameEn,
                 systemNameZh: config.systemNameZh,
                 icpCode: config.icpCode,
+                defaultView: config.defaultView ?? true,
             });
             setLogoPreview(config.logoBase64 || '');
         }
@@ -178,6 +181,27 @@ const SystemConfigComponent = () => {
                             tooltip="ICP 备案号将显示在公共页面底部，例如：京ICP备12345678号"
                         >
                             <Input placeholder="例如：京ICP备12345678号"/>
+                        </Form.Item>
+
+                        <Form.Item
+                            label="默认视图模式"
+                            name="defaultView"
+                            tooltip="选择公共页面默认显示的视图模式"
+                        >
+                            <Radio.Group>
+                                <Radio.Button value="grid">
+                                    <Space size={4}>
+                                        <Grid3x3 size={16} />
+                                        <span>网格视图</span>
+                                    </Space>
+                                </Radio.Button>
+                                <Radio.Button value="list">
+                                    <Space size={4}>
+                                        <List size={16} />
+                                        <span>列表视图</span>
+                                    </Space>
+                                </Radio.Button>
+                            </Radio.Group>
                         </Form.Item>
 
                         <Form.Item

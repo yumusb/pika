@@ -221,7 +221,7 @@ const CustomTooltip = ({active, payload, label, unit = ' ms'}: TooltipProps<numb
     }
 
     return (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs shadow-lg dark:shadow-slate-950/50">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-xs shadow-lg dark:shadow-slate-950/50 z-50 relative">
             <p className="font-semibold text-slate-700 dark:text-slate-200">{label}</p>
             <div className="mt-1 space-y-1">
                 {payload.map((entry, index) => {

@@ -1,20 +1,21 @@
-Database:
-  Enabled: true
-  Type: postgres
-  Postgres:
-    Hostname: localhost
-    Port: 5432
-    Username: pika
-    Password: pika
-    Database: pika
-  ShowSql: false
+database:
+  enabled: true
+  type: postgres
+  postgres:
+    hostname: localhost
+    port: 5432
+    username: pika
+    password: pika
+    database: pika
+  show_sql: false
 log:
-  Level: debug # 日志等级  debug,info,waring,error
-  Filename: ./logs/pika.log
+  level: debug # 日志等级  debug,info,waring,error
+  filename: ./logs/pika.log
 
-Server:
-  Addr: "0.0.0.0:8080"
-  IPExtractor: "X-Forwarded-For"
+server:
+  addr: "0.0.0.0:8080"
+  ip_extractor: "x-forwarded-for"
+  ip_trust_list: "0.0.0.0/0"
 
 App:
   JWT:

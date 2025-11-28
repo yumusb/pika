@@ -7,6 +7,7 @@ export interface SystemConfig {
     systemNameZh: string;  // 中文名称
     logoBase64: string;    // Logo 的 base64 编码
     icpCode: string;       // ICP 备案号
+    defaultView: string;  // 默认视图 grid,list
 }
 
 // 获取系统配置（管理后台使用）

@@ -13,7 +13,7 @@ interface PublicLayoutContextType {
 }
 
 const PublicLayout = () => {
-    const [viewMode, setViewMode] = useState<ViewMode>('grid');
+    const [viewMode, setViewMode] = useState<ViewMode>(window.SystemConfig?.DefaultView === 'list' ? 'list' : 'grid');
     const [showViewToggle, setShowViewToggle] = useState(false);
 
     return (
