@@ -33,6 +33,7 @@ build-agents:
 	$(GOFLAGS) GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o bin/agents/pika-agent-linux-amd64 cmd/agent/*.go
 	$(GOFLAGS) GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -o bin/agents/pika-agent-linux-arm64 cmd/agent/*.go
 	$(GOFLAGS) GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="$(LDFLAGS)" -o bin/agents/pika-agent-linux-armv7 cmd/agent/*.go
+	$(GOFLAGS) GOOS=linux GOARCH=loong64 go build -ldflags="$(LDFLAGS)" -o bin/agents/pika-agent-linux-loong64 cmd/agent/*.go
 
 	# macOS
 	$(GOFLAGS) GOOS=darwin GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o bin/agents/pika-agent-darwin-amd64 cmd/agent/*.go
