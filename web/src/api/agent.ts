@@ -468,3 +468,8 @@ export interface GetTagsResponse {
 export const getTags = () => {
     return get<GetTagsResponse>('/admin/agents/tags');
 };
+
+// 获取公开的探针标签列表（无需认证）
+export const getPublicTags = () => {
+    return get<GetTagsResponse>('/agents/tags');
+};

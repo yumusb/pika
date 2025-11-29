@@ -1,8 +1,8 @@
-import {type ReactNode, useEffect} from 'react';
+import {type ReactNode, useEffect, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import {useQuery} from '@tanstack/react-query';
 import {Cpu, EthernetPortIcon, HardDrive, Loader2, MemoryStick, Network} from 'lucide-react';
-import {listAgents} from '../../api/agent';
+import {listAgents, getPublicTags} from '../../api/agent';
 import type {Agent, LatestMetrics} from '../../types';
 import {usePublicLayout} from '../PublicLayout';
 
@@ -132,6 +132,7 @@ const getStatusDisplay = (status: number) => {
 const ServerList = () => {
     const navigate = useNavigate();
     const {viewMode, setShowViewToggle} = usePublicLayout();
+    const [selectedTag, setSelectedTag] = useState<string>('');
 
     // 挂载时启用视图切换，卸载时禁用
     useEffect(() => {
@@ -149,7 +150,20 @@ const ServerList = () => {
         refetchInterval: 5000,
     });
 
-    const filteredAgents = agents;
+    // 获取标签列表
+    const {data: tagsData} = useQuery({
+        queryKey: ['tags', 'public'],
+        queryFn: async () => {
+            const response = await getPublicTags();
+            return response.data.tags || [];
+        },
+        refetchInterval: 30000, // 每30秒刷新一次标签
+    });
+
+    // 根据选中的标签过滤服务器
+    const filteredAgents = selectedTag
+        ? agents.filter(agent => agent.tags?.includes(selectedTag))
+        : agents;
 
     const handleNavigate = (agentId: string) => {
         navigate(`/servers/${agentId}`);
@@ -460,11 +474,59 @@ const ServerList = () => {
     }
 
     return (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-4">
+            {/* 标签过滤器 */}
+            {tagsData && tagsData.length > 0 && (
+                <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                    <button
+                        onClick={() => setSelectedTag('')}
+                        className={`cursor-pointer inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                            selectedTag === ''
+                                ? 'bg-blue-500 dark:bg-sky-500 text-white shadow-md shadow-blue-500/30 dark:shadow-sky-500/30'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                        <span>全部</span>
+                        <span className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-semibold ${
+                            selectedTag === ''
+                                ? 'bg-blue-400 dark:bg-sky-400 text-white'
+                                : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                        }`}>
+                            {agents.length}
+                        </span>
+                    </button>
+                    {tagsData.map((tag) => {
+                        const count = agents.filter(agent => agent.tags?.includes(tag)).length;
+                        if (count === 0) return null;
+
+                        return (
+                            <button
+                                key={tag}
+                                onClick={() => setSelectedTag(tag)}
+                                className={`cursor-pointer inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                    selectedTag === tag
+                                        ? 'bg-blue-500 dark:bg-sky-500 text-white shadow-md shadow-blue-500/30 dark:shadow-sky-500/30'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                }`}
+                            >
+                                <span>{tag}</span>
+                                <span className={`inline-flex items-center justify-center rounded-md px-2 py-0.5 text-xs font-semibold ${
+                                    selectedTag === tag
+                                        ? 'bg-blue-400 dark:bg-sky-400 text-white'
+                                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                                }`}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
             {filteredAgents.length === 0 ? (
                 <EmptyState
-                    title='暂无在线服务器'
-                    description='当前没有任何探针在线，请稍后再试。'
+                    title={selectedTag ? '没有匹配的服务器' : '暂无在线服务器'}
+                    description={selectedTag ? `标签 "${selectedTag}" 下暂无服务器` : '当前没有任何探针在线，请稍后再试。'}
                 />
             ) : viewMode === 'grid' ? (
                 renderGridView()

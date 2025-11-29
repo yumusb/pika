@@ -178,6 +178,7 @@ func setupApi(app *orz.App, components *AppComponents) {
 	{
 		// 探针信息（公开访问，支持可选认证）- 用于公共展示页面
 		publicApiWithOptionalAuth.GET("/agents", components.AgentHandler.GetAgents)
+		publicApiWithOptionalAuth.GET("/agents/tags", components.AgentHandler.GetTags)
 		publicApiWithOptionalAuth.GET("/agents/:id", components.AgentHandler.Get)
 		publicApiWithOptionalAuth.GET("/agents/:id/metrics", components.AgentHandler.GetMetrics)
 		publicApiWithOptionalAuth.GET("/agents/:id/metrics/latest", components.AgentHandler.GetLatestMetrics)

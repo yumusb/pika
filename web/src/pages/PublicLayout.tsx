@@ -1,5 +1,5 @@
 import {Outlet, useOutletContext} from 'react-router-dom';
-import {useState} from 'react';
+import {useState, useEffect} from 'react';
 import PublicHeader from '../components/PublicHeader';
 import PublicFooter from '../components/PublicFooter';
 
@@ -12,9 +12,35 @@ interface PublicLayoutContextType {
     setShowViewToggle: (show: boolean) => void;
 }
 
+const getInitialViewMode = (): ViewMode => {
+    // 检查是否为移动端（屏幕宽度小于 1024px）
+    const isMobile = window.innerWidth < 1024;
+
+    // 移动端默认使用 grid 视图
+    if (isMobile) {
+        return 'grid';
+    }
+
+    // 桌面端使用配置的默认视图
+    return window.SystemConfig?.DefaultView === 'list' ? 'list' : 'grid';
+};
+
 const PublicLayout = () => {
-    const [viewMode, setViewMode] = useState<ViewMode>(window.SystemConfig?.DefaultView === 'list' ? 'list' : 'grid');
+    const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode());
     const [showViewToggle, setShowViewToggle] = useState(false);
+
+    // 监听窗口大小变化，在移动端和桌面端切换时调整视图
+    useEffect(() => {
+        const handleResize = () => {
+            const isMobile = window.innerWidth < 1024;
+            if (isMobile && viewMode === 'list') {
+                setViewMode('grid');
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [viewMode]);
 
     return (
         <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col transition-colors">
