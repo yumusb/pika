@@ -17,7 +17,7 @@ func NewDiskIOCollector() *DiskIOCollector {
 }
 
 // Collect 采集磁盘 IO 数据(间隔1秒采集两次计算速率)
-func (d *DiskIOCollector) Collect() ([]*protocol.DiskIOData, error) {
+func (d *DiskIOCollector) Collect() ([]protocol.DiskIOData, error) {
 	// 第一次采集
 	firstCounters, err := d.collectOnce()
 	if err != nil {
@@ -40,9 +40,9 @@ func (d *DiskIOCollector) Collect() ([]*protocol.DiskIOData, error) {
 	}
 
 	// 计算速率(基于两次采集的差值)
-	var diskIODataList []*protocol.DiskIOData
+	var diskIODataList []protocol.DiskIOData
 	for device, counter := range secondCounters {
-		diskIOData := &protocol.DiskIOData{
+		diskIOData := protocol.DiskIOData{
 			Device:         device,
 			ReadCount:      counter.ReadCount,
 			WriteCount:     counter.WriteCount,
