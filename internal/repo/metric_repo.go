@@ -2,8 +2,6 @@ package repo
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 
 	"github.com/dushixiang/pika/internal/models"
 	"gorm.io/gorm"
@@ -55,46 +53,6 @@ func (r *MetricRepo) SaveTemperatureMetric(ctx context.Context, metric *models.T
 	return r.db.WithContext(ctx).Create(metric).Error
 }
 
-// GetLatestGPUMetrics 获取最新的GPU指标列表
-func (r *MetricRepo) GetLatestGPUMetrics(ctx context.Context, agentID string) ([]models.GPUMetric, error) {
-	var metrics []models.GPUMetric
-	// 获取每个GPU的最新记录
-	err := r.db.WithContext(ctx).
-		Raw(`
-			SELECT g1.* FROM gpu_metrics g1
-			INNER JOIN (
-				SELECT index, MAX(timestamp) as max_timestamp
-				FROM gpu_metrics
-				WHERE agent_id = ?
-				GROUP BY index
-			) g2 ON g1.index = g2.index AND g1.timestamp = g2.max_timestamp
-			WHERE g1.agent_id = ?
-			ORDER BY g1.index
-		`, agentID, agentID).
-		Scan(&metrics).Error
-	return metrics, err
-}
-
-// GetLatestTemperatureMetrics 获取最新的温度指标列表
-func (r *MetricRepo) GetLatestTemperatureMetrics(ctx context.Context, agentID string) ([]models.TemperatureMetric, error) {
-	var metrics []models.TemperatureMetric
-	// 获取每个传感器的最新记录
-	err := r.db.WithContext(ctx).
-		Raw(`
-			SELECT t1.* FROM temperature_metrics t1
-			INNER JOIN (
-				SELECT sensor_key, MAX(timestamp) as max_timestamp
-				FROM temperature_metrics
-				WHERE agent_id = ?
-				GROUP BY sensor_key
-			) t2 ON t1.sensor_key = t2.sensor_key AND t1.timestamp = t2.max_timestamp
-			WHERE t1.agent_id = ?
-			ORDER BY t1.sensor_key
-		`, agentID, agentID).
-		Scan(&metrics).Error
-	return metrics, err
-}
-
 // SaveHostMetric 保存主机信息指标（按 agent 覆盖，避免先删后插的空窗）
 func (r *MetricRepo) SaveHostMetric(ctx context.Context, metric *models.HostMetric) error {
 	return r.db.WithContext(ctx).
@@ -105,35 +63,9 @@ func (r *MetricRepo) SaveHostMetric(ctx context.Context, metric *models.HostMetr
 		Create(metric).Error
 }
 
-// GetLatestHostMetric 获取最新的主机信息
-func (r *MetricRepo) GetLatestHostMetric(ctx context.Context, agentID string) (*models.HostMetric, error) {
-	var metric models.HostMetric
-	err := r.db.WithContext(ctx).
-		Where("agent_id = ?", agentID).
-		Order("timestamp DESC").
-		First(&metric).Error
-	if err != nil {
-		return nil, err
-	}
-	return &metric, nil
-}
-
 // SaveNetworkConnectionMetric 保存网络连接统计指标
 func (r *MetricRepo) SaveNetworkConnectionMetric(ctx context.Context, metric *models.NetworkConnectionMetric) error {
 	return r.db.WithContext(ctx).Create(metric).Error
-}
-
-// GetLatestNetworkConnectionMetric 获取最新的网络连接统计
-func (r *MetricRepo) GetLatestNetworkConnectionMetric(ctx context.Context, agentID string) (*models.NetworkConnectionMetric, error) {
-	var metric models.NetworkConnectionMetric
-	err := r.db.WithContext(ctx).
-		Where("agent_id = ?", agentID).
-		Order("timestamp DESC").
-		First(&metric).Error
-	if err != nil {
-		return nil, err
-	}
-	return &metric, nil
 }
 
 // AggregatedNetworkConnectionMetric 网络连接统计聚合指标
@@ -365,86 +297,6 @@ func (r *MetricRepo) GetNetworkMetrics(ctx context.Context, agentID string, star
 	return metrics, err
 }
 
-// GetLatestCPUMetric 获取最新的CPU指标
-func (r *MetricRepo) GetLatestCPUMetric(ctx context.Context, agentID string) (*models.CPUMetric, error) {
-	var metric models.CPUMetric
-	err := r.db.WithContext(ctx).
-		Where("agent_id = ?", agentID).
-		Order("timestamp DESC").
-		First(&metric).Error
-	if err != nil {
-		return nil, err
-	}
-	return &metric, nil
-}
-
-// GetLatestMemoryMetric 获取最新的内存指标
-func (r *MetricRepo) GetLatestMemoryMetric(ctx context.Context, agentID string) (*models.MemoryMetric, error) {
-	var metric models.MemoryMetric
-	err := r.db.WithContext(ctx).
-		Where("agent_id = ?", agentID).
-		Order("timestamp DESC").
-		First(&metric).Error
-	if err != nil {
-		return nil, err
-	}
-	return &metric, nil
-}
-
-// GetLatestDiskMetrics 获取最新的磁盘指标（所有挂载点）
-func (r *MetricRepo) GetLatestDiskMetrics(ctx context.Context, agentID string) (*models.DiskMetric, error) {
-	// 先获取最新时间戳
-	var latestTimestamp sql.NullInt64
-	err := r.db.WithContext(ctx).
-		Model(&models.DiskMetric{}).
-		Where("agent_id = ?", agentID).
-		Select("MAX(timestamp)").
-		Scan(&latestTimestamp).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	if !latestTimestamp.Valid {
-		return nil, fmt.Errorf("no disk metrics found for agent %s", agentID)
-	}
-
-	// 获取该时间戳的所有磁盘数据
-	var metric models.DiskMetric
-	err = r.db.WithContext(ctx).
-		Where("mount_point = ? AND agent_id = ? AND timestamp = ?", "all", agentID, latestTimestamp.Int64).
-		First(&metric).Error
-
-	return &metric, err
-}
-
-// GetLatestNetworkMetrics 获取最新的网络指标（所有网卡）
-func (r *MetricRepo) GetLatestNetworkMetrics(ctx context.Context, agentID string) (*models.NetworkMetric, error) {
-	// 先获取最新时间戳
-	var latestTimestamp sql.NullInt64
-	err := r.db.WithContext(ctx).
-		Model(&models.NetworkMetric{}).
-		Where("agent_id = ?", agentID).
-		Select("MAX(timestamp)").
-		Scan(&latestTimestamp).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	if !latestTimestamp.Valid {
-		return nil, fmt.Errorf("no network metrics found for agent %s", agentID)
-	}
-
-	// 获取该时间戳的所有网络数据
-	var metric models.NetworkMetric
-	err = r.db.WithContext(ctx).
-		Where("agent_id = ? AND timestamp = ?", agentID, latestTimestamp.Int64).
-		First(&metric).Error
-
-	return &metric, err
-}
-
 // SaveMonitorMetric 保存监控指标
 func (r *MetricRepo) SaveMonitorMetric(ctx context.Context, metric *models.MonitorMetric) error {
 	return r.db.WithContext(ctx).Create(metric).Error
@@ -462,24 +314,6 @@ func (r *MetricRepo) GetMonitorMetrics(ctx context.Context, agentID, monitorID s
 	}
 
 	err := query.Order("timestamp ASC").Find(&metrics).Error
-	return metrics, err
-}
-
-// GetLatestMonitorMetrics 获取最新的监控指标（每个监控项的最新一条）
-func (r *MetricRepo) GetLatestMonitorMetrics(ctx context.Context, agentID string) ([]models.MonitorMetric, error) {
-	var metrics []models.MonitorMetric
-	err := r.db.WithContext(ctx).Raw(`
-		SELECT m.*
-		FROM monitor_metrics m
-		INNER JOIN (
-			SELECT monitor_id, MAX(timestamp) AS ts
-			FROM monitor_metrics
-			WHERE agent_id = ?
-			GROUP BY monitor_id
-		) latest ON m.monitor_id = latest.monitor_id AND m.timestamp = latest.ts
-		WHERE m.agent_id = ?
-		ORDER BY m.monitor_id
-	`, agentID, agentID).Scan(&metrics).Error
 	return metrics, err
 }
 

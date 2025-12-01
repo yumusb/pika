@@ -9,6 +9,8 @@ import (
 	"github.com/dushixiang/pika/internal/models"
 	"github.com/dushixiang/pika/internal/protocol"
 	"github.com/dushixiang/pika/internal/repo"
+
+	"github.com/go-orz/cache"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -43,6 +45,8 @@ type MetricService struct {
 	metricRepo       *repo.MetricRepo
 	monitorStatsRepo *repo.MonitorStatsRepo
 	propertyService  *PropertyService
+
+	latestCache cache.Cache[string, *LatestMetrics]
 }
 
 // NewMetricService 创建指标服务
@@ -52,12 +56,19 @@ func NewMetricService(logger *zap.Logger, db *gorm.DB, propertyService *Property
 		metricRepo:       repo.NewMetricRepo(db),
 		monitorStatsRepo: repo.NewMonitorStatsRepo(db),
 		propertyService:  propertyService,
+		latestCache:      cache.New[string, *LatestMetrics](time.Minute),
 	}
 }
 
 // HandleMetricData 处理指标数据
 func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, metricType string, data json.RawMessage) error {
 	now := time.Now().UnixMilli()
+
+	latestMetrics, ok := s.latestCache.Get(agentID)
+	if !ok {
+		latestMetrics = &LatestMetrics{}
+		s.latestCache.Set(agentID, latestMetrics, time.Hour)
+	}
 
 	switch protocol.MetricType(metricType) {
 	case protocol.MetricTypeCPU:
@@ -74,6 +85,7 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 			ModelName:     cpuData.ModelName,
 			Timestamp:     now,
 		}
+		latestMetrics.CPU = metric
 		return s.metricRepo.SaveCPUMetric(ctx, metric)
 
 	case protocol.MetricTypeMemory:
@@ -93,6 +105,7 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 			SwapFree:     memData.SwapFree,
 			Timestamp:    now,
 		}
+		latestMetrics.Memory = metric
 		return s.metricRepo.SaveMemoryMetric(ctx, metric)
 
 	case protocol.MetricTypeDisk:
@@ -143,7 +156,13 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 			Free:         totalFree,
 			UsagePercent: maxUsagePercent, // 使用率取最大值
 			Timestamp:    now,
-			TotalDisks:   len(diskDataList),
+		}
+		latestMetrics.Disk = &DiskSummary{
+			AvgUsagePercent: totalMetric.UsagePercent,
+			TotalDisks:      len(diskDataList),
+			Total:           totalMetric.Total,
+			Used:            totalMetric.Used,
+			Free:            totalMetric.Free,
 		}
 		return s.metricRepo.SaveDiskMetric(ctx, totalMetric)
 
@@ -186,14 +205,20 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 
 		// 保存合并后的总和数据（interface 字段设置为空字符串）
 		totalMetric := &models.NetworkMetric{
-			AgentID:         agentID,
-			Interface:       "all", // 空字符串表示所有网卡的合并数据
-			BytesSentRate:   totalSentRate,
-			BytesRecvRate:   totalRecvRate,
-			BytesSentTotal:  totalSentTotal,
-			BytesRecvTotal:  totalRecvTotal,
-			Timestamp:       now,
-			TotalInterfaces: len(networkDataList),
+			AgentID:        agentID,
+			Interface:      "all", // 空字符串表示所有网卡的合并数据
+			BytesSentRate:  totalSentRate,
+			BytesRecvRate:  totalRecvRate,
+			BytesSentTotal: totalSentTotal,
+			BytesRecvTotal: totalRecvTotal,
+			Timestamp:      now,
+		}
+		latestMetrics.Network = &NetworkSummary{
+			TotalBytesSentRate:  totalSentRate,
+			TotalBytesRecvRate:  totalRecvRate,
+			TotalBytesSentTotal: totalSentTotal,
+			TotalBytesRecvTotal: totalRecvTotal,
+			TotalInterfaces:     len(networkDataList),
 		}
 		return s.metricRepo.SaveNetworkMetric(ctx, totalMetric)
 
@@ -218,6 +243,7 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 			Total:       connData.Total,
 			Timestamp:   now,
 		}
+		latestMetrics.NetworkConnection = metric
 		return s.metricRepo.SaveNetworkConnectionMetric(ctx, metric)
 
 	case protocol.MetricTypeDiskIO:
@@ -285,6 +311,7 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 			Procs:           hostData.Procs,
 			Timestamp:       now,
 		}
+		latestMetrics.Host = metric
 		return s.metricRepo.SaveHostMetric(ctx, metric)
 
 	case protocol.MetricTypeGPU:
@@ -725,67 +752,8 @@ func (s *MetricService) cleanupOldMetrics(ctx context.Context) {
 
 // GetLatestMetrics 获取最新指标
 func (s *MetricService) GetLatestMetrics(ctx context.Context, agentID string) (*LatestMetrics, error) {
-	result := &LatestMetrics{}
-
-	// 获取最新CPU指标
-	if cpu, err := s.metricRepo.GetLatestCPUMetric(ctx, agentID); err == nil {
-		result.CPU = cpu
-	}
-
-	// 获取最新内存指标
-	if memory, err := s.metricRepo.GetLatestMemoryMetric(ctx, agentID); err == nil {
-		result.Memory = memory
-	}
-
-	// 获取最新磁盘指标并计算平均使用率和总容量
-	if disk, err := s.metricRepo.GetLatestDiskMetrics(ctx, agentID); err == nil {
-		result.Disk = &DiskSummary{
-			AvgUsagePercent: disk.UsagePercent,
-			TotalDisks:      disk.TotalDisks,
-			Total:           disk.Total,
-			Used:            disk.Used,
-			Free:            disk.Free,
-		}
-	}
-
-	// 获取最新网络指标并汇总速率和累计流量
-	// 注意: 采集器已经计算好了每秒速率,这里直接汇总所有网卡的速率和累计流量
-	if network, err := s.metricRepo.GetLatestNetworkMetrics(ctx, agentID); err == nil {
-		result.Network = &NetworkSummary{
-			TotalBytesSentRate:  network.BytesSentRate,  // 所有网卡的总发送速率(字节/秒)
-			TotalBytesRecvRate:  network.BytesRecvRate,  // 所有网卡的总接收速率(字节/秒)
-			TotalBytesSentTotal: network.BytesSentTotal, // 所有网卡的累计发送流量
-			TotalBytesRecvTotal: network.BytesRecvTotal, // 所有网卡的累计接收流量
-			TotalInterfaces:     network.TotalInterfaces,
-		}
-	}
-
-	// 获取最新主机信息
-	if host, err := s.metricRepo.GetLatestHostMetric(ctx, agentID); err == nil {
-		result.Host = host
-	}
-
-	// 获取最新GPU信息
-	if gpu, err := s.metricRepo.GetLatestGPUMetrics(ctx, agentID); err == nil && len(gpu) > 0 {
-		result.GPU = gpu
-	}
-
-	// 获取最新温度信息
-	if temp, err := s.metricRepo.GetLatestTemperatureMetrics(ctx, agentID); err == nil && len(temp) > 0 {
-		result.Temp = temp
-	}
-
-	// 获取最新网络连接统计
-	if netConn, err := s.metricRepo.GetLatestNetworkConnectionMetric(ctx, agentID); err == nil {
-		result.NetworkConnection = netConn
-	}
-
-	return result, nil
-}
-
-// GetLatestMonitorMetrics 获取最新的监控指标
-func (s *MetricService) GetLatestMonitorMetrics(ctx context.Context, agentID string) ([]models.MonitorMetric, error) {
-	return s.metricRepo.GetLatestMonitorMetrics(ctx, agentID)
+	metrics, _ := s.latestCache.Get(agentID)
+	return metrics, nil
 }
 
 // GetMonitorMetrics 获取监控指标历史数据
@@ -834,6 +802,4 @@ type LatestMetrics struct {
 	Network           *NetworkSummary                 `json:"network,omitempty"`
 	NetworkConnection *models.NetworkConnectionMetric `json:"networkConnection,omitempty"`
 	Host              *models.HostMetric              `json:"host,omitempty"`
-	GPU               []models.GPUMetric              `json:"gpu,omitempty"`
-	Temp              []models.TemperatureMetric      `json:"temperature,omitempty"`
 }

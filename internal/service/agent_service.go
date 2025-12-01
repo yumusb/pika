@@ -311,11 +311,6 @@ func (s *AgentService) GetStatistics(ctx context.Context) (map[string]interface{
 	}, nil
 }
 
-// GetLatestMonitorMetrics 获取最新的监控指标
-func (s *AgentService) GetLatestMonitorMetrics(ctx context.Context, agentID string) ([]models.MonitorMetric, error) {
-	return s.metricService.GetLatestMonitorMetrics(ctx, agentID)
-}
-
 // GetMonitorMetrics 获取监控指标历史数据
 func (s *AgentService) GetMonitorMetrics(ctx context.Context, agentID, monitorName string, start, end int64) ([]models.MonitorMetric, error) {
 	return s.metricService.GetMonitorMetrics(ctx, agentID, monitorName, start, end)

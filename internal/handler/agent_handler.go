@@ -713,22 +713,6 @@ func (h *AgentHandler) GetMonitorMetrics(c echo.Context) error {
 	})
 }
 
-// GetLatestMonitorMetrics 获取最新的监控指标
-func (h *AgentHandler) GetLatestMonitorMetrics(c echo.Context) error {
-	agentID := c.Param("id")
-	ctx := c.Request().Context()
-
-	metrics, err := h.agentService.GetLatestMonitorMetrics(ctx, agentID)
-	if err != nil {
-		return err
-	}
-
-	return orz.Ok(c, orz.Map{
-		"agentId": agentID,
-		"metrics": metrics,
-	})
-}
-
 // Delete 删除探针
 func (h *AgentHandler) Delete(c echo.Context) error {
 	agentID := c.Param("id")

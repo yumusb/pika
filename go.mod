@@ -6,6 +6,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-errors/errors v1.5.1
+	github.com/go-orz/cache v0.0.4
 	github.com/go-orz/orz v0.2.9
 	github.com/go-orz/toolkit v0.1.0
 	github.com/go-playground/locales v0.14.1
