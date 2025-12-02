@@ -248,7 +248,7 @@ const AuditResultView = ({result}: AuditResultViewProps) => {
     ];
 
     const loginRecordColumns = [
-        {title: '用户名', dataIndex: 'username', key: 'username'},
+        {title: '用户名', dataIndex: 'username', key: 'username', width: 200},
         {title: 'IP地址', dataIndex: 'ip', key: 'ip', width: 150},
         {title: '归属地', dataIndex: 'location', key: 'location', width: 200, ellipsis: true},
         {title: '终端', dataIndex: 'terminal', key: 'terminal', width: 100},
@@ -257,7 +257,6 @@ const AuditResultView = ({result}: AuditResultViewProps) => {
             dataIndex: 'timestamp',
             key: 'timestamp',
             render: (val: number) => dayjs(val).format('YYYY-MM-DD HH:mm:ss'),
-            width: 180,
         },
         {
             title: '状态',
