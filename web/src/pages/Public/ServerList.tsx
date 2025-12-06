@@ -106,7 +106,7 @@ const calculateDiskUsage = (metrics?: LatestMetrics) => {
     }
 
     // 后端已经计算好平均使用率,直接返回
-    return metrics.disk.avgUsagePercent;
+    return metrics.disk.usagePercent;
 };
 
 const getProgressColor = (percent: number) => {

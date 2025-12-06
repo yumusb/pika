@@ -412,7 +412,7 @@ func startMetricsMonitoring(ctx context.Context, components *AppComponents, logg
 				}
 
 				if latest.Disk != nil {
-					diskUsage = latest.Disk.AvgUsagePercent
+					diskUsage = latest.Disk.UsagePercent
 				}
 
 				if latest.Network != nil {

@@ -66,9 +66,11 @@ type CollectorConfig struct {
 	// 如果为空，使用默认排除规则（虚拟网卡、回环地址等）
 	NetworkExclude []string `yaml:"network_exclude"`
 
-	// 磁盘采集包含的挂载点列表（白名单，支持正则表达式）
-	// 如果为空，默认只采集根分区 "^/$"
-	// 例如: ["^/$", "^/data$", "^/mnt/.*"]
+	// 磁盘采集包含的挂载点列表（白名单）
+	// 如果为空，默认采集系统主分区（Linux/macOS: "/"，Windows: "C:\"）
+	// 例如:
+	//   Linux/macOS: ["/", "/data", "/home"]
+	//   Windows: ["C:\\", "D:\\"]
 	DiskInclude []string `yaml:"disk_include"`
 }
 
@@ -334,7 +336,7 @@ func (c *Config) GetNetworkExcludePatterns() ([]*regexp.Regexp, error) {
 // 1. 如果配置了 NetworkInclude（白名单），则只保留匹配白名单的网卡
 // 2. 如果没有配置 NetworkInclude，则使用 NetworkExclude（黑名单）规则
 func (c *Config) ShouldExcludeNetworkInterface(interfaceName string) bool {
-	// 优先检查白��单
+	// 优先检查白名单
 	includePatterns, err := c.GetNetworkIncludePatterns()
 	if err != nil {
 		// 白名单编译失败，记录错误但继续使用黑名单逻辑
@@ -367,42 +369,28 @@ func (c *Config) ShouldExcludeNetworkInterface(interfaceName string) bool {
 	return false
 }
 
-// GetDiskIncludePatterns 获取磁盘包含的正则表达式列表（白名单）
+// GetDiskInclude 获取磁盘包含的挂载点列表（白名单）
 // 如果配置为空，返回默认的根分区匹配规则
-func (c *Config) GetDiskIncludePatterns() ([]*regexp.Regexp, error) {
-	patterns := c.Collector.DiskInclude
-
-	// 如果没有配置，使用默认规则（只采集根分区）
-	if len(patterns) == 0 {
-		patterns = []string{"^/$"}
-	}
-
-	var regexps []*regexp.Regexp
-	for _, pattern := range patterns {
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			return nil, fmt.Errorf("编译磁盘包含规则 '%s' 失败: %w", pattern, err)
+// Linux/macOS: ["/"]
+// Windows: ["C:\\"]
+func (c *Config) GetDiskInclude() []string {
+	if len(c.Collector.DiskInclude) == 0 {
+		if runtime.GOOS == "windows" {
+			return []string{"C:\\"}
 		}
-		regexps = append(regexps, re)
+		return []string{"/"}
 	}
-
-	return regexps, nil
+	return c.Collector.DiskInclude
 }
 
 // ShouldIncludeDiskMountPoint 检查挂载点是否应该被采集
-// 只有匹配 DiskInclude 白名单的挂载点才会被采集
+// 只有在 DiskInclude 白名单中的挂载点才会被采集
 func (c *Config) ShouldIncludeDiskMountPoint(mountPoint string) bool {
-	includePatterns, err := c.GetDiskIncludePatterns()
-	if err != nil {
-		// 如果正则编译失败，只采集根分区
-		return mountPoint == "/"
-	}
-
-	for _, pattern := range includePatterns {
-		if pattern.MatchString(mountPoint) {
+	includeMounts := c.GetDiskInclude()
+	for _, mount := range includeMounts {
+		if mountPoint == mount {
 			return true
 		}
 	}
-
 	return false
 }

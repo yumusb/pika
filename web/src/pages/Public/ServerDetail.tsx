@@ -754,7 +754,7 @@ const ServerDetail = () => {
             icon: HardDrive,
             title: '磁盘使用',
             usagePercent: latestMetrics.disk
-                ? `${formatPercentValue(latestMetrics.disk.avgUsagePercent)}%`
+                ? `${formatPercentValue(latestMetrics.disk.usagePercent)}%`
                 : '—',
             accent: 'purple',
             metrics: [

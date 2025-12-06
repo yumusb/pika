@@ -125,7 +125,7 @@ export interface MemoryMetric {
 
 // 磁盘汇总数据
 export interface DiskSummary {
-    avgUsagePercent: number;  // 平均使用率
+    usagePercent: number;  // 平均使用率
     totalDisks: number;       // 磁盘数量
     total: number;            // 总容量(字节)
     used: number;             // 已使用(字节)

@@ -118,7 +118,6 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 
 		// 合并所有磁盘的数据用于保存总和
 		var totalTotal, totalUsed, totalFree uint64
-		var maxUsagePercent float64
 
 		// 保存每个磁盘的数据，同时累加总和
 		for _, diskData := range diskDataList {
@@ -143,27 +142,28 @@ func (s *MetricService) HandleMetricData(ctx context.Context, agentID string, me
 			totalTotal += diskData.Total
 			totalUsed += diskData.Used
 			totalFree += diskData.Free
-			if diskData.UsagePercent > maxUsagePercent {
-				maxUsagePercent = diskData.UsagePercent
-			}
 		}
 
 		// 保存合并后的总和数据（mount_point 字段设置为空字符串）
+		var usagePercent float64
+		if totalTotal > 0 {
+			usagePercent = float64(totalUsed) / float64(totalTotal) * 100
+		}
 		totalMetric := &models.DiskMetric{
 			AgentID:      agentID,
 			MountPoint:   "all",
 			Total:        totalTotal,
 			Used:         totalUsed,
 			Free:         totalFree,
-			UsagePercent: maxUsagePercent, // 使用率取最大值
+			UsagePercent: usagePercent,
 			Timestamp:    now,
 		}
 		latestMetrics.Disk = &DiskSummary{
-			AvgUsagePercent: totalMetric.UsagePercent,
-			TotalDisks:      len(diskDataList),
-			Total:           totalMetric.Total,
-			Used:            totalMetric.Used,
-			Free:            totalMetric.Free,
+			UsagePercent: totalMetric.UsagePercent,
+			TotalDisks:   len(diskDataList),
+			Total:        totalMetric.Total,
+			Used:         totalMetric.Used,
+			Free:         totalMetric.Free,
 		}
 		return s.metricRepo.SaveDiskMetric(ctx, totalMetric)
 
@@ -786,11 +786,11 @@ func (s *MetricService) GetAvailableNetworkInterfaces(ctx context.Context, agent
 
 // DiskSummary 磁盘汇总数据
 type DiskSummary struct {
-	AvgUsagePercent float64 `json:"avgUsagePercent"` // 平均使用率
-	TotalDisks      int     `json:"totalDisks"`      // 磁盘数量
-	Total           uint64  `json:"total"`           // 总容量(字节)
-	Used            uint64  `json:"used"`            // 已使用(字节)
-	Free            uint64  `json:"free"`            // 空闲(字节)
+	UsagePercent float64 `json:"usagePercent"` // 平均使用率
+	TotalDisks   int     `json:"totalDisks"`   // 磁盘数量
+	Total        uint64  `json:"total"`        // 总容量(字节)
+	Used         uint64  `json:"used"`         // 已使用(字节)
+	Free         uint64  `json:"free"`         // 空闲(字节)
 }
 
 // NetworkSummary 网络汇总数据
