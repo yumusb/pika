@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/dushixiang/pika/internal/models"
 	"github.com/dushixiang/pika/internal/repo"
 	"github.com/dushixiang/pika/web"
+	"github.com/go-orz/cache"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -30,42 +30,35 @@ const (
 type PropertyService struct {
 	repo   *repo.PropertyRepo
 	logger *zap.Logger
-	// 内存缓存，key 为 property ID，value 为 Property 对象
-	cache map[string]models.Property
-	// 缓存读写锁
-	mu sync.RWMutex
+	// 内存缓存，使用 go-orz/cache，永不过期
+	cache cache.Cache[string, *models.Property]
 }
 
 func NewPropertyService(logger *zap.Logger, db *gorm.DB) *PropertyService {
 	return &PropertyService{
 		repo:   repo.NewPropertyRepo(db),
 		logger: logger,
-		cache:  make(map[string]models.Property),
+		cache:  cache.New[string, *models.Property](time.Minute), // 0 表示永不过期
 	}
 }
 
 // Get 获取属性（返回原始 JSON 字符串）
-func (s *PropertyService) Get(ctx context.Context, id string) (models.Property, error) {
+func (s *PropertyService) Get(ctx context.Context, id string) (*models.Property, error) {
 	// 先尝试从缓存读取
-	s.mu.RLock()
-	if cached, ok := s.cache[id]; ok {
-		s.mu.RUnlock()
-		return cached, nil
+	if property, ok := s.cache.Get(id); ok {
+		return property, nil
 	}
-	s.mu.RUnlock()
 
 	// 缓存未命中，从数据库读取
 	property, err := s.repo.FindById(ctx, id)
 	if err != nil {
-		return models.Property{}, err
+		return nil, err
 	}
 
 	// 更新缓存
-	s.mu.Lock()
-	s.cache[id] = property
-	s.mu.Unlock()
+	s.cache.Set(id, &property, time.Hour)
 
-	return property, nil
+	return &property, nil
 }
 
 // GetValue 获取属性值并反序列化
@@ -104,9 +97,7 @@ func (s *PropertyService) Set(ctx context.Context, id string, name string, value
 	}
 
 	// 清空缓存中的该项，下次读取时会重新从数据库加载
-	s.mu.Lock()
-	delete(s.cache, id)
-	s.mu.Unlock()
+	s.cache.Delete(id)
 
 	return nil
 }
