@@ -22,7 +22,7 @@ func NewTemperatureCollector() *TemperatureCollector {
 func (t *TemperatureCollector) Collect() ([]*protocol.TemperatureData, error) {
 	// 使用 gopsutil 的 sensors 包采集温度数据
 	temps, err := sensors.TemperaturesWithContext(context.Background())
-	if err != nil {
+	if err != nil && len(temps) == 0 {
 		// 如果获取失败，返回空数组（某些系统可能不支持）
 		return []*protocol.TemperatureData{}, nil
 	}
@@ -93,6 +93,11 @@ func guessSensorType(key string) string {
 			strings.Contains(keyLower, "nouveau") || // NVIDIA 开源驱动
 			strings.Contains(keyLower, "gpu") { // 通用 GPU
 			return "GPU"
+		}
+
+		// NPU 温度传感器
+		if strings.Contains(keyLower, "npu") {
+			return "NPU"
 		}
 
 		// 硬盘/SSD 温度传感器
