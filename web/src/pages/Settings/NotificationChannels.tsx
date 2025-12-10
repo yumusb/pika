@@ -594,8 +594,8 @@ const NotificationChannels = () => {
                                         <div>• <code>alert_message</code> - 告警详情</div>
                                         <div>• <code>threshold</code> - 阈值</div>
                                         <div>• <code>actual_value</code> - 当前值</div>
-                                        <div>• <code>fired_at</code> - 触发时间戳</div>
-                                        <div>• <code>resolved_at</code> - 恢复时间戳</div>
+                                        <div>• <code>fired_at</code> - 触发时间(格式化)</div>
+                                        <div>• <code>resolved_at</code> - 恢复时间(格式化)</div>
 
                                     </div>
                                 </div>
@@ -622,10 +622,8 @@ const NotificationChannels = () => {
                                         <div>• <code>{`{{alert.message}}`}</code> - 告警消息</div>
                                         <div>• <code>{`{{alert.threshold}}`}</code> - 阈值</div>
                                         <div>• <code>{`{{alert.actualValue}}`}</code> - 当前值</div>
-                                        <div>• <code>{`{{alert.firedAt}}`}</code> - 触发时间戳</div>
-                                        <div>• <code>{`{{alert.firedAtFormatted}}`}</code> - 触发时间(格式化)</div>
-                                        <div>• <code>{`{{alert.resolvedAt}}`}</code> - 恢复时间戳</div>
-                                        <div>• <code>{`{{alert.resolvedAtFormatted}}`}</code> - 恢复时间(格式化)</div>
+                                        <div>• <code>{`{{alert.firedAt}}`}</code> - 触发时间(格式化)</div>
+                                        <div>• <code>{`{{alert.resolvedAt}}`}</code> - 恢复时间(格式化)</div>
                                     </div>
                                     <div className={'mt-2 pt-2 border-t'}>
                                         <div className={'font-semibold mb-1'}>示例：</div>

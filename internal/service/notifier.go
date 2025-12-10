@@ -320,13 +320,9 @@ func (n *Notifier) sendCustomWebhook(ctx context.Context, config map[string]inte
 			case "alert.actualValue":
 				v = fmt.Sprintf("%.2f", record.ActualValue)
 			case "alert.firedAt":
-				v = fmt.Sprintf("%d", record.FiredAt)
-			case "alert.firedAtFormatted":
 				// 格式化的触发时间 (使用系统时区，Docker 中设置为 Asia/Shanghai)
 				v = time.Unix(record.FiredAt/1000, 0).Local().Format("2006-01-02 15:04:05")
 			case "alert.resolvedAt":
-				v = fmt.Sprintf("%d", record.ResolvedAt)
-			case "alert.resolvedAtFormatted":
 				// 格式化的恢复时间 (使用系统时区，Docker 中设置为 Asia/Shanghai)
 				if record.ResolvedAt > 0 {
 					v = time.Unix(record.ResolvedAt/1000, 0).Local().Format("2006-01-02 15:04:05")
