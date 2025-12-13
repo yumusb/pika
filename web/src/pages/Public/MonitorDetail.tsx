@@ -24,7 +24,7 @@ import {
 } from '@/api/monitor.ts';
 import type {PublicMonitor} from '@/types';
 import {cn} from '@/lib/utils';
-import {formatDate, formatDateTime, formatTime} from "@/utils/util.ts";
+import {formatDateTime, formatTime} from "@/utils/util.ts";
 import {renderCert} from "@/pages/Public/Monitor.tsx";
 
 
@@ -423,13 +423,12 @@ const MonitorDetail = () => {
     }
 
     const monitorTitle = monitorDetail.name ?? '监控详情';
-    const hasCert = monitorDetail.certExpiryTime > 0;
-    const certExpired = hasCert && monitorDetail.certDaysLeft < 0;
-    const certExpiringSoon = hasCert && monitorDetail.certDaysLeft >= 0 && monitorDetail.certDaysLeft < 30;
 
     const heroStats = [
         {label: '监控类型', value: monitorDetail.type.toUpperCase()},
         {label: '探针数量', value: `${monitorDetail.agentCount} 个`},
+        {label: '当前响应', value: `${monitorDetail.responseTime}ms`},
+        {label: '当前状态', value: `${monitorDetail.status}`},
     ];
 
     return (
@@ -467,7 +466,6 @@ const MonitorDetail = () => {
                                         <p className="mt-2 text-sm text-white/80">
                                             {monitorDetail.target}
                                         </p>
-                                        <p className="text-xs text-white/60">公共视图 · 实时监控概览</p>
                                     </div>
                                 </div>
                             </div>
@@ -495,79 +493,6 @@ const MonitorDetail = () => {
                 </section>
 
                 <main className="flex-1 py-10 space-y-10">
-                    {/* 概览统计 */}
-                    <Card title="监控概览" description="当前监控状态和关键指标">
-                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                            <StatCard
-                                icon={<Clock className="h-6 w-6"/>}
-                                label="当前响应"
-                                value={formatTime(monitorDetail.responseTime)}
-                                color="blue"
-                            />
-                        </div>
-
-                        {/* 证书信息 */}
-                        {hasCert && (
-                            <div className={cn(
-                                "mt-6 rounded-2xl border p-6",
-                                certExpired
-                                    ? 'border-red-200 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10'
-                                    : certExpiringSoon
-                                        ? 'border-amber-200 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10'
-                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/40'
-                            )}>
-                                <div className="flex items-center gap-3">
-                                    <Shield className={cn(
-                                        "h-6 w-6",
-                                        certExpired
-                                            ? 'text-red-600 dark:text-red-200'
-                                            : certExpiringSoon
-                                                ? 'text-amber-600 dark:text-amber-200'
-                                                : 'text-slate-600 dark:text-slate-400'
-                                    )}/>
-                                    <div>
-                                        <h3 className={cn(
-                                            "text-lg font-semibold",
-                                            certExpired
-                                                ? 'text-red-900 dark:text-red-100'
-                                                : certExpiringSoon
-                                                    ? 'text-amber-900 dark:text-amber-100'
-                                                    : 'text-slate-900 dark:text-white'
-                                        )}>
-                                            TLS 证书信息
-                                        </h3>
-                                        <p className={cn(
-                                            "mt-1 text-sm",
-                                            certExpired
-                                                ? 'text-red-700 dark:text-red-200'
-                                                : certExpiringSoon
-                                                    ? 'text-amber-700 dark:text-amber-200'
-                                                    : 'text-slate-600 dark:text-slate-400'
-                                        )}>
-                                            证书到期时间: {formatDate(monitorDetail.certExpiryTime)}
-                                            {certExpired ? (
-                                                <span
-                                                    className="ml-1">(已过期 {Math.abs(monitorDetail.certDaysLeft)} 天)</span>
-                                            ) : (
-                                                <span className="ml-1">(剩余 {monitorDetail.certDaysLeft} 天)</span>
-                                            )}
-                                        </p>
-                                        {certExpired && (
-                                            <p className="mt-2 text-sm font-medium text-red-700 dark:text-red-200">
-                                                🚨 证书已过期，请立即更新
-                                            </p>
-                                        )}
-                                        {certExpiringSoon && (
-                                            <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-200">
-                                                ⚠️ 证书即将过期，请及时更新
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </Card>
-
                     {/* 响应时间趋势图表 */}
                     <Card
                         title="历史趋势"
