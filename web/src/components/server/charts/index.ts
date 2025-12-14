@@ -6,3 +6,4 @@ export {DiskIOChart} from './DiskIOChart';
 export {NetworkConnectionChart} from './NetworkConnectionChart';
 export {GpuChart} from './GpuChart';
 export {TemperatureChart} from './TemperatureChart';
+export {MonitorChart} from './MonitorChart';

@@ -408,7 +408,7 @@ func (h *AgentHandler) GetMetrics(c echo.Context) error {
 	// 验证指标类型
 	validTypes := map[string]bool{
 		"cpu": true, "memory": true, "disk": true, "network": true, "network_connection": true,
-		"disk_io": true, "gpu": true, "temperature": true,
+		"disk_io": true, "gpu": true, "temperature": true, "monitor": true,
 	}
 	if metricType == "" {
 		return orz.NewError(400, "指标类型不能为空")

@@ -364,10 +364,12 @@ const ServerList = () => {
                                                 </div>
                                                 <div
                                                     className={`text-[10px] font-mono flex items-center gap-1 ${server.expireTime && server.expireTime > 0 ? 'text-cyan-600' : 'text-emerald-500/60'}`}>
-                                                    <Calendar className="w-3 h-3"/>
-                                                    {server.expireTime > 0
-                                                        ? `EXP: ${new Date(server.expireTime).toLocaleDateString('zh-CN')}`
-                                                        : ''
+
+                                                    {server.expireTime > 0 &&
+                                                        <div className={'flex items-center gap-1'}>
+                                                            <Calendar className="w-3 h-3"/>
+                                                            <div>过期时间: {new Date(server.expireTime).toLocaleDateString('zh-CN')}</div>
+                                                        </div>
                                                     }
                                                 </div>
                                             </div>

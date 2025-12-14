@@ -187,13 +187,6 @@ func (s *MonitorService) DeleteMonitor(ctx context.Context, id string) error {
 		if err := s.MonitorRepo.DeleteById(ctx, id); err != nil {
 			return err
 		}
-
-		// 删除监控指标数据（从 VictoriaMetrics）
-		if err := s.metricService.DeleteMonitorMetrics(ctx, id); err != nil {
-			s.logger.Error("删除监控指标数据失败", zap.String("monitorId", id), zap.Error(err))
-			return err
-		}
-
 		return nil
 	})
 

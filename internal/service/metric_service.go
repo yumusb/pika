@@ -23,6 +23,7 @@ type MetricService struct {
 	logger          *zap.Logger
 	metricRepo      *repo.MetricRepo
 	agentRepo       *repo.AgentRepo
+	monitorRepo     *repo.MonitorRepo
 	propertyService *PropertyService
 	trafficService  *TrafficService // 流量统计服务
 	vmClient        *vmclient.VMClient
@@ -38,6 +39,7 @@ func NewMetricService(logger *zap.Logger, db *gorm.DB, propertyService *Property
 		logger:             logger,
 		metricRepo:         repo.NewMetricRepo(db),
 		agentRepo:          repo.NewAgentRepo(db),
+		monitorRepo:        repo.NewMonitorRepo(db),
 		propertyService:    propertyService,
 		trafficService:     trafficService,
 		vmClient:           vmClient,
@@ -244,6 +246,45 @@ func (s *MetricService) GetMetrics(ctx context.Context, agentID, metricType stri
 		series = append(series, convertedSeries...)
 	}
 
+	// 如果是监控类型，添加监控任务名称到标签中
+	if metricType == "monitor" && len(series) > 0 {
+		// 收集所有 monitor_id
+		monitorIdSet := make(map[string]struct{})
+		for _, s := range series {
+			if monitorId, ok := s.Labels["monitor_id"]; ok {
+				monitorIdSet[monitorId] = struct{}{}
+			}
+		}
+
+		// 查询 monitor 信息
+		if len(monitorIdSet) > 0 {
+			monitorIds := make([]string, 0, len(monitorIdSet))
+			for monitorId := range monitorIdSet {
+				monitorIds = append(monitorIds, monitorId)
+			}
+
+			monitors, err := s.monitorRepo.FindByIdIn(ctx, monitorIds)
+			if err != nil {
+				s.logger.Error("查询 monitor 信息失败", zap.Error(err))
+			} else {
+				// 构建 monitorId -> monitorName 映射
+				monitorNameMap := make(map[string]string)
+				for _, monitor := range monitors {
+					monitorNameMap[monitor.ID] = monitor.Name
+				}
+
+				// 在每个 series 的 labels 中添加 monitor_name
+				for i := range series {
+					if monitorId, ok := series[i].Labels["monitor_id"]; ok {
+						if monitorName, exists := monitorNameMap[monitorId]; exists {
+							series[i].Labels["monitor_name"] = monitorName
+						}
+					}
+				}
+			}
+		}
+	}
+
 	return &metric.GetMetricsResponse{
 		AgentID: agentID,
 		Type:    metricType,
@@ -289,33 +330,7 @@ func (s *MetricService) DeleteAgentMetrics(ctx context.Context, agentID string) 
 		// 继续删除 VictoriaMetrics 中的数据
 	}
 
-	// 2. 删除 VictoriaMetrics 中的时间序列数据
-	match := []string{fmt.Sprintf(`pika_.*{agent_id="%s"}`, agentID)}
-	if err := s.vmClient.DeleteSeries(ctx, match); err != nil {
-		s.logger.Error("删除 VictoriaMetrics 中的探针数据失败",
-			zap.String("agentID", agentID),
-			zap.Error(err))
-		return err
-	}
-
-	s.logger.Info("成功删除探针的所有指标数据",
-		zap.String("agentID", agentID))
-	return nil
-}
-
-// DeleteMonitorMetrics 删除指定监控任务的所有指标数据
-func (s *MetricService) DeleteMonitorMetrics(ctx context.Context, monitorID string) error {
-	// 删除 VictoriaMetrics 中的监控指标数据
-	match := []string{fmt.Sprintf(`pika_monitor_.*{monitor_id="%s"}`, monitorID)}
-	if err := s.vmClient.DeleteSeries(ctx, match); err != nil {
-		s.logger.Error("删除 VictoriaMetrics 中的监控数据失败",
-			zap.String("monitorID", monitorID),
-			zap.Error(err))
-		return err
-	}
-
-	s.logger.Info("成功删除监控任务的所有指标数据",
-		zap.String("monitorID", monitorID))
+	// 2. 不主动删除 VictoriaMetrics 中的时间序列数据，利用过期机制自动删除数据
 	return nil
 }
 
@@ -430,6 +445,13 @@ func (s *MetricService) buildPromQLQueries(agentID, metricType string, interface
 			Name:  "temperature",
 			Query: fmt.Sprintf(`pika_temperature_celsius{agent_id="%s"}`, agentID),
 		}}
+
+	case "monitor":
+		// 监控：响应时间（该探针参与的所有监控任务）
+		queries = []metric.QueryDefinition{{
+			Name:  "response_time",
+			Query: fmt.Sprintf(`pika_monitor_response_time_ms{agent_id="%s"}`, agentID),
+		}}
 	}
 
 	return queries
@@ -491,6 +513,9 @@ func (s *MetricService) convertQueryResultToSeries(result *vmclient.QueryResult,
 			finalName = fmt.Sprintf("GPU_%s", gpuIndex)
 			delete(labels, "gpu_index")
 		}
+
+		// 移除 target 标签（避免数据泄露）
+		delete(labels, "target")
 
 		allSeries = append(allSeries, metric.Series{
 			Name:   finalName,

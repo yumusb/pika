@@ -8,7 +8,7 @@ export interface ListAgentsResponse {
 
 export interface GetAgentMetricsRequest {
     agentId: string;
-    type: 'cpu' | 'memory' | 'disk' | 'network' | 'network_connection' | 'disk_io' | 'gpu' | 'temperature';
+    type: 'cpu' | 'memory' | 'disk' | 'network' | 'network_connection' | 'disk_io' | 'gpu' | 'temperature' | 'monitor';
     range?: string; // 时间范围，如 '15m', '1h', '1d' 等，从后端配置获取
     interface?: string; // 网卡过滤参数（仅对 network 类型有效）
 }

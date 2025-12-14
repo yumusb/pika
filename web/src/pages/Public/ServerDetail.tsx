@@ -13,6 +13,7 @@ import {
     DiskIOChart,
     GpuChart,
     MemoryChart,
+    MonitorChart,
     NetworkChart,
     NetworkConnectionChart,
     TemperatureChart,
@@ -95,6 +96,11 @@ const ServerDetail = () => {
                             <div className="grid gap-4 sm:gap-5 lg:gap-6 grid-cols-1">
                                 <GpuChart agentId={id!} timeRange={timeRange}/>
                                 <TemperatureChart agentId={id!} timeRange={timeRange}/>
+                            </div>
+
+                            {/* 监控指标：单列全宽 */}
+                            <div className="grid gap-4 sm:gap-5 lg:gap-6 grid-cols-1">
+                                <MonitorChart agentId={id!} timeRange={timeRange}/>
                             </div>
                         </div>
                     </Card>
