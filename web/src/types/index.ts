@@ -214,7 +214,7 @@ export interface TemperatureMetric {
     id: number;
     agentId: string;
     sensorKey: string;
-    sensorLabel: string;
+    type: string;
     temperature: number;
     timestamp: number;
 }
