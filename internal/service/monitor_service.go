@@ -352,20 +352,14 @@ func (s *MonitorService) SendMonitorTaskToAgents(ctx context.Context, monitor mo
 	}
 
 	if monitor.Type == "http" || monitor.Type == "https" {
-		var httpConfig protocol.HTTPMonitorConfig
-		if err := monitor.HTTPConfig.Scan(&httpConfig); err == nil {
-			item.HTTPConfig = &httpConfig
-		}
+		httpConfig := monitor.HTTPConfig.Data()
+		item.HTTPConfig = &httpConfig
 	} else if monitor.Type == "tcp" {
-		var tcpConfig protocol.TCPMonitorConfig
-		if err := monitor.TCPConfig.Scan(&tcpConfig); err == nil {
-			item.TCPConfig = &tcpConfig
-		}
+		var tcpConfig = monitor.TCPConfig.Data()
+		item.TCPConfig = &tcpConfig
 	} else if monitor.Type == "icmp" || monitor.Type == "ping" {
-		var icmpConfig protocol.ICMPMonitorConfig
-		if err := monitor.ICMPConfig.Scan(&icmpConfig); err == nil {
-			item.ICMPConfig = &icmpConfig
-		}
+		var icmpConfig = monitor.ICMPConfig.Data()
+		item.ICMPConfig = &icmpConfig
 	}
 
 	// 构建 payload
