@@ -91,11 +91,3 @@ docker-compose -f docker-compose.postgresql.yml up -d
 请备注 pika
 
 <img src="screenshots/wx1.png" width="300" height="auto"/>
-
-## 许可证
-
-本项目采用 MIT 许可证。
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
