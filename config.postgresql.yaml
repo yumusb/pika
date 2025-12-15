@@ -2,7 +2,7 @@ database:
   enabled: true
   type: postgres
   postgres:
-    hostname: postgresql
+    hostname: pika-postgresql
     port: 5432
     username: pika
     password: pika
@@ -19,7 +19,7 @@ server:
 
 App:
   JWT:
-    Secret: "you_must_change_me" # 替换为任意 UUID 字符串
+    Secret: "" # 替换为任意 UUID 字符串
     ExpiresHours: 168 # 7天
 
   # Basic Auth 用户配置（使用 bcrypt 加密）
@@ -43,7 +43,7 @@ App:
     ClientID: "your-github-client-id"
     ClientSecret: "your-github-client-secret"
     RedirectURL: "http://localhost:8080/github/callback"  # 前端回调页面
-    AllowedUsers:  # 允许登录的 GitHub 用户名白名单，不配置或留空则允许所有用户
+    AllowedUsers: # 允许登录的 GitHub 用户名白名单，不配置或留空则允许所有用户
       - "your-github-username"
       - "another-username"
   GeoIP:

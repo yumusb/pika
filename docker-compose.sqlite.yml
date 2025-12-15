@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.131.0
+    container_name: victoriametrics
+    restart: always
+    command:
+      - "-retentionPeriod=7d"  # 保留 7 天数据
+      - "-storageDataPath=/victoria-metrics-data"
+      - "-httpListenAddr=:8428"
+    ports:
+      - "127.0.0.1:8428:8428"  # API, PromQL, insert, select
+    volumes:
+      - ./data/vmdata:/victoria-metrics-data
+    networks:
+      - pika-network
+  pika:
+    image: dushixiang/pika:latest
+    container_name: pika-server
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./data:/app/data
+    # 开启 Geo 配置后打开下面的配置
+    #  - ./GeoLite2-City.mmdb:/app/GeoLite2-City.mmdb
+    ports:
+      - "8080:8080"
+    depends_on:
+      - victoriametrics
+    restart: unless-stopped
+    networks:
+      - pika-network
+
+networks:
+  pika-network:
+    driver: bridge
+
+
