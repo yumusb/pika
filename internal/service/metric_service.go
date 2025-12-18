@@ -632,7 +632,6 @@ func (s *MetricService) GetMonitorAgentStats(monitorID string) []protocol.Monito
 	// 转换为数组并填充 agent 名称
 	result := make([]protocol.MonitorData, 0, latestMetrics.Agents.Len())
 	for stat := range latestMetrics.Agents.Values() {
-		stat.Target = ""                            // 隐藏目标地址
 		stat.AgentName = agentNameMap[stat.AgentId] // 填充 agent 名称
 		result = append(result, *stat)
 	}
