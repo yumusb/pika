@@ -47,7 +47,7 @@ export const SnapshotGrid = ({cards}: SnapshotGridProps) => (
             return (
                 <div
                     key={card.key}
-                    className="rounded-xl border border-slate-200 dark:border-cyan-900/50 bg-slate-50 dark:bg-black/40 p-4 transition hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-cyan-700/50"
+                    className="rounded-xl border border-slate-200 dark:border-cyan-900/50 bg-slate-50 dark:bg-black/40 p-4 transition hover:border-slate-300 dark:hover:border-cyan-700/50"
                 >
                     <div className="mb-3 flex items-start justify-between">
                         <div className="flex items-center gap-2">
