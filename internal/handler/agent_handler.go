@@ -854,10 +854,10 @@ download_agent() {
 
     echo_info "正在下载探针..."
 
-    if command -v wget &> /dev/null; then
-        wget -q --show-progress "$download_url" -O "$temp_file"
-    elif command -v curl &> /dev/null; then
+    if command -v curl &> /dev/null; then
         curl -# -L "$download_url" -o "$temp_file"
+    elif command -v wget &> /dev/null; then
+        wget -q "$download_url" -O "$temp_file"
     else
         echo_error "未找到 wget 或 curl 命令，请先安装其中之一"
         exit 1
