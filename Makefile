@@ -38,18 +38,18 @@ build-agents:
 	@mkdir -p bin/agents
 
 	# Linux
-	$(GOFLAGS) GOOS=linux GOARCH=amd64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-amd64 cmd/agent/*.go
-	$(GOFLAGS) GOOS=linux GOARCH=arm64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-arm64 cmd/agent/*.go
-	$(GOFLAGS) GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-armv7 cmd/agent/*.go
-	$(GOFLAGS) GOOS=linux GOARCH=loong64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-loong64 cmd/agent/*.go
+	$(GOFLAGS) GOOS=linux GOARCH=amd64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-amd64 ./cmd/agent
+	$(GOFLAGS) GOOS=linux GOARCH=arm64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-arm64 ./cmd/agent
+	$(GOFLAGS) GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-armv7 ./cmd/agent
+	$(GOFLAGS) GOOS=linux GOARCH=loong64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-linux-loong64 ./cmd/agent
 
 	# macOS
-	$(GOFLAGS) GOOS=darwin GOARCH=amd64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-darwin-amd64 cmd/agent/*.go
-	$(GOFLAGS) GOOS=darwin GOARCH=arm64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-darwin-arm64 cmd/agent/*.go
+	$(GOFLAGS) GOOS=darwin GOARCH=amd64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-darwin-amd64 ./cmd/agent
+	$(GOFLAGS) GOOS=darwin GOARCH=arm64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-darwin-arm64 ./cmd/agent
 
 	# Windows
-	$(GOFLAGS) GOOS=windows GOARCH=amd64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-windows-amd64.exe cmd/agent/*.go
-	$(GOFLAGS) GOOS=windows GOARCH=arm64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-windows-arm64.exe cmd/agent/*.go
+	$(GOFLAGS) GOOS=windows GOARCH=amd64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-windows-amd64.exe ./cmd/agent
+	$(GOFLAGS) GOOS=windows GOARCH=arm64 go build -ldflags="$(AGENT_LDFLAGS)" -o bin/agents/pika-agent-windows-arm64.exe ./cmd/agent
 
 	@echo "All agents built successfully!"
 	@echo "Compressing agents with UPX..."
