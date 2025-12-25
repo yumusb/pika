@@ -134,37 +134,26 @@ func (m *Manager) migrateFromOldPath() error {
 		return fmt.Errorf("检查旧 ID 文件失败: %w", err)
 	}
 
-	// 检查新文件是否已存在
-	if _, err := os.Stat(newPath); err == nil {
-		// 新文件已存在，不覆盖，删除旧文件
-		fmt.Printf("新 ID 文件已存在，删除旧文件: %s\n", oldPath)
-		return os.Remove(oldPath)
-	}
-
 	// 确保新路径的目录存在
 	newDir := filepath.Dir(newPath)
 	if err := os.MkdirAll(newDir, 0755); err != nil {
 		return fmt.Errorf("创建新目录失败: %w", err)
 	}
 
-	// 移动文件
-	if err := os.Rename(oldPath, newPath); err != nil {
-		// 如果 Rename 失败（可能跨文件系统），尝试复制后删除
-		data, readErr := os.ReadFile(oldPath)
-		if readErr != nil {
-			return fmt.Errorf("读取旧 ID 文件失败: %w", readErr)
-		}
+	// 强制迁移：读取旧文件内容
+	data, err := os.ReadFile(oldPath)
+	if err != nil {
+		return fmt.Errorf("读取旧 ID 文件失败: %w", err)
+	}
 
-		if writeErr := os.WriteFile(newPath, data, oldInfo.Mode()); writeErr != nil {
-			return fmt.Errorf("写入新 ID 文件失败: %w", writeErr)
-		}
+	// 写入新路径（覆盖已存在的文件）
+	if err := os.WriteFile(newPath, data, oldInfo.Mode()); err != nil {
+		return fmt.Errorf("写入新 ID 文件失败: %w", err)
+	}
 
-		if removeErr := os.Remove(oldPath); removeErr != nil {
-			fmt.Printf("警告: 删除旧 ID 文件失败: %v\n", removeErr)
-		}
-
-		fmt.Printf("已迁移 ID 文件: %s -> %s\n", oldPath, newPath)
-		return nil
+	// 删除旧文件
+	if err := os.Remove(oldPath); err != nil {
+		fmt.Printf("警告: 删除旧 ID 文件失败: %v\n", err)
 	}
 
 	fmt.Printf("已迁移 ID 文件: %s -> %s\n", oldPath, newPath)
