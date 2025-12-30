@@ -14,6 +14,12 @@
 curl -fsSL https://raw.githubusercontent.com/dushixiang/pika/main/scripts/update-restartsec.sh | sudo bash
 ```
 
+访问不到 Github 的用户可以使用我提供的备用脚本。
+
+```bash
+curl -fsSL https://f.typeaudit.com/scripts/update-restartsec.sh | sudo bash
+```
+
 ### 脚本功能
 
 1. ✓ 检查是否以 root 权限运行
