@@ -35,10 +35,13 @@ export interface GetAgentMetricsResponse {
 }
 
 // 管理员接口 - 获取所有探针（需要认证）
-export const getAgentPaging = (pageIndex: number = 1, pageSize: number = 10, hostname?: string, ip?: string, status?: string) => {
+export const getAgentPaging = (pageIndex: number = 1, pageSize: number = 10, name: string, hostname?: string, ip?: string, status?: string) => {
     const params = new URLSearchParams();
     params.append('pageIndex', pageIndex.toString());
     params.append('pageSize', pageSize.toString());
+    if (name) {
+        params.append('name', name);
+    }
     if (hostname) {
         params.append('hostname', hostname);
     }

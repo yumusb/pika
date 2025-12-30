@@ -396,11 +396,12 @@ const AgentList = () => {
                     </Space>
                 )}
                 request={async (params) => {
-                    const {current = 1, pageSize = 10, hostname, ip, status} = params;
+                    const {current = 1, pageSize = 10, name, hostname, ip, status} = params;
                     try {
                         const response = await getAgentPaging(
                             current,
                             pageSize,
+                            name,
                             hostname,
                             ip,
                             status as string | undefined
