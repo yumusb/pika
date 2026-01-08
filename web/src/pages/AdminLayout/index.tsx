@@ -37,12 +37,6 @@ const AdminLayout = () => {
                 icon: <Server className="h-4 w-4" strokeWidth={2}/>,
             },
             {
-                key: 'api-keys',
-                label: 'API密钥',
-                path: '/admin/api-keys',
-                icon: <Key className="h-4 w-4" strokeWidth={2}/>,
-            },
-            {
                 key: 'monitors',
                 label: '服务监控',
                 path: '/admin/monitors',
@@ -53,6 +47,12 @@ const AdminLayout = () => {
                 label: 'DDNS',
                 path: '/admin/ddns',
                 icon: <Globe className="h-4 w-4" strokeWidth={2}/>,
+            },
+            {
+                key: 'api-keys',
+                label: 'API密钥',
+                path: '/admin/api-keys',
+                icon: <Key className="h-4 w-4" strokeWidth={2}/>,
             },
             {
                 key: 'alert-records',
