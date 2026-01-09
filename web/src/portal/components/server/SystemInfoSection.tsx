@@ -6,8 +6,6 @@ import {formatBytes, formatDateTime, formatPercentValue, formatUptime} from '@po
 import type {Agent, LatestMetrics} from '@/types';
 import CyberCard from "@portal/components/CyberCard.tsx";
 
-type AccentVariant = 'blue' | 'emerald' | 'purple' | 'amber';
-
 interface SystemInfoSectionProps {
     agent: Agent;
     latestMetrics: LatestMetrics | null;
@@ -125,19 +123,18 @@ export const SystemInfoSection = ({agent, latestMetrics}: SystemInfoSectionProps
         ];
 
         // 如果配置了流量限额，添加流量统计信息到网络卡片
-        if (agent && agent.trafficLimit && agent.trafficLimit > 0) {
-            const trafficUsedPercent = ((agent.trafficUsed || 0) / agent.trafficLimit) * 100;
-            const trafficRemaining = agent.trafficLimit - (agent.trafficUsed || 0);
+        if (agent?.trafficStats?.enabled && agent.trafficStats.limit > 0) {
+            const trafficUsedPercent = (agent.trafficStats.used / agent.trafficStats.limit) * 100;
 
             networkMetrics.push({
                 label: '流量限额',
-                value: `${formatBytes(agent.trafficUsed || 0, 1)} / ${formatBytes(agent.trafficLimit, 1)} (${formatPercentValue(trafficUsedPercent)}%)`,
+                value: `${formatBytes(agent.trafficStats.used, 1)} / ${formatBytes(agent.trafficStats.limit, 1)} (${formatPercentValue(trafficUsedPercent)}%)`,
             });
 
-            if (agent.trafficResetDay && agent.trafficResetDay > 0) {
+            if (agent.trafficStats.resetDay > 0) {
                 networkMetrics.push({
                     label: '重置日期',
-                    value: `每月${agent.trafficResetDay}号`,
+                    value: `每月${agent.trafficStats.resetDay}号`,
                 });
             }
         }

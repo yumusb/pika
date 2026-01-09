@@ -8,6 +8,7 @@ import (
 	"github.com/dushixiang/pika/internal/utils"
 	"github.com/go-orz/orz"
 	"github.com/labstack/echo/v4"
+	"gorm.io/datatypes"
 )
 
 // Get 获取探针详情（公开接口，已登录返回全部，未登录返回公开可见）
@@ -21,6 +22,10 @@ func (h *AgentHandler) Get(c echo.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// 隐藏敏感配置
+	agent.SSHLoginConfig = datatypes.JSONType[models.SSHLoginConfigData]{}
+	agent.TamperProtectConfig = datatypes.JSONType[models.TamperProtectConfigData]{}
 
 	// 未登录时隐藏敏感信息
 	if !isAuthenticated {

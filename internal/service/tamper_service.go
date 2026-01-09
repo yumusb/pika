@@ -3,15 +3,17 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/dushixiang/pika/internal/models"
 	"github.com/dushixiang/pika/internal/protocol"
 	"github.com/dushixiang/pika/internal/repo"
 	"github.com/dushixiang/pika/internal/websocket"
+
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -32,33 +34,56 @@ func NewTamperService(logger *zap.Logger, db *gorm.DB, wsManager *websocket.Mana
 }
 
 // GetConfigByAgentID 获取探针的防篡改配置
-func (s *TamperService) GetConfigByAgentID(agentID string) (*models.TamperProtectConfigData, error) {
-	config, err := s.agentRepo.GetTamperProtectConfig(context.Background(), agentID)
+func (s *TamperService) GetConfigByAgentID(ctx context.Context, agentID string) (*models.TamperProtectConfigData, error) {
+	agent, err := s.agentRepo.FindById(ctx, agentID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil // 没有配置不算错误
-		}
 		return nil, err
 	}
-	return config, nil
+	config := agent.TamperProtectConfig.Data()
+	return &config, nil
+}
+
+func (s *TamperService) UpdateConfigByAgentID(ctx context.Context, agentID string, config *models.TamperProtectConfigData) error {
+	var agentForUpdate = models.Agent{
+		ID:                  agentID,
+		TamperProtectConfig: datatypes.NewJSONType(*config),
+	}
+	return s.agentRepo.UpdateById(ctx, &agentForUpdate)
 }
 
 // UpdateConfig 更新探针的防篡改配置
-func (s *TamperService) UpdateConfig(agentID string, enabled bool, paths []string) (*models.TamperProtectConfigData, error) {
+func (s *TamperService) UpdateConfig(ctx context.Context, agentID string, enabled bool, paths []string) error {
 	// 查找现有配置
-	config, err := s.agentRepo.GetTamperProtectConfig(context.Background(), agentID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+	config, err := s.GetConfigByAgentID(ctx, agentID)
+	if err != nil {
+		return err
 	}
 
-	// 获取旧的路径列表用于比对
+	// 获取旧的路径列表和启用状态用于比对
 	var oldPaths []string
+	var wasEnabled bool
 	if config != nil {
 		oldPaths = config.Paths
+		wasEnabled = config.Enabled
 	}
 
-	// 计算新增和移除的路径
-	added, removed := s.calculatePathDiff(oldPaths, paths)
+	var added, removed []string
+
+	// 处理不同的状态转换场景
+	if !enabled {
+		// 场景1: 禁用防篡改功能，需要移除所有旧的路径配置
+		removed = oldPaths
+		added = []string{}
+		// 注意: 不清空 paths，保留配置以便下次启用时使用
+	} else if !wasEnabled {
+		// 场景2: 从禁用切换到启用，所有路径都作为新增
+		// 因为探针端已经移除了所有监控，需要重新添加
+		added = paths
+		removed = []string{}
+	} else {
+		// 场景3: 启用状态下的正常增量更新
+		added, removed = s.calculatePathDiff(oldPaths, paths)
+	}
 
 	// 创建或更新配置
 	newConfig := &models.TamperProtectConfigData{
@@ -67,12 +92,12 @@ func (s *TamperService) UpdateConfig(agentID string, enabled bool, paths []strin
 	}
 
 	// 保存配置到数据库
-	if err := s.agentRepo.UpdateTamperProtectConfig(context.Background(), agentID, newConfig); err != nil {
-		return nil, err
+	if err := s.UpdateConfigByAgentID(ctx, agentID, newConfig); err != nil {
+		return err
 	}
 
 	// 下发增量配置到探针
-	if err := s.sendConfigToAgent(agentID, added, removed); err != nil {
+	if err := s.sendIncrementalConfigToAgent(agentID, added, removed); err != nil {
 		s.logger.Warn("下发防篡改配置到探针失败",
 			zap.String("agentId", agentID),
 			zap.Strings("added", added),
@@ -87,7 +112,7 @@ func (s *TamperService) UpdateConfig(agentID string, enabled bool, paths []strin
 			zap.Int("totalPaths", len(paths)))
 	}
 
-	return newConfig, nil
+	return nil
 }
 
 // calculatePathDiff 计算路径的新增和移除
@@ -120,8 +145,27 @@ func (s *TamperService) calculatePathDiff(oldPaths, newPaths []string) (added, r
 	return added, removed
 }
 
-// sendConfigToAgent 通过WebSocket下发配置到探针（增量更新）
-func (s *TamperService) sendConfigToAgent(agentID string, added, removed []string) error {
+// BuildInitialConfig 构建探针初始化时的配置（用于探针连接时）
+// 根据 enabled 状态决定发送的内容：
+// - enabled=true: 发送所有配置的路径作为新增
+// - enabled=false: 发送空配置
+func (s *TamperService) BuildInitialConfig(ctx context.Context, agentID string) (added, removed []string, err error) {
+	config, err := s.GetConfigByAgentID(ctx, agentID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 如果启用了防篡改，将所有路径作为新增发送
+	if config != nil && config.Enabled && len(config.Paths) > 0 {
+		return config.Paths, []string{}, nil
+	}
+
+	// 未启用或没有配置，返回空
+	return []string{}, []string{}, nil
+}
+
+// sendIncrementalConfigToAgent 通过WebSocket下发配置到探针（增量更新）
+func (s *TamperService) sendIncrementalConfigToAgent(agentID string, added, removed []string) error {
 	// 如果没有任何变更，不需要下发
 	if len(added) == 0 && len(removed) == 0 {
 		return nil
@@ -164,4 +208,28 @@ func (s *TamperService) CleanupOldRecords(ctx context.Context) error {
 	// 30天前的时间戳
 	threshold := time.Now().AddDate(0, 0, -30).UnixMilli()
 	return s.TamperEventRepo.DeleteOldEvents(ctx, threshold)
+}
+
+func (s *TamperService) HandleConfigResult(ctx context.Context, agentID string, resp protocol.TamperProtectResponse) error {
+	// 获取现有配置
+	config, err := s.GetConfigByAgentID(ctx, agentID)
+	if err != nil {
+		return fmt.Errorf("获取配置失败: %w", err)
+	}
+
+	// 更新配置应用状态
+	status := "success"
+	if !resp.Success {
+		status = "failed"
+	}
+
+	config.ApplyStatus = status
+	config.ApplyMessage = resp.Message
+
+	var agentForUpdate = models.Agent{
+		ID:                  agentID,
+		TamperProtectConfig: datatypes.NewJSONType(*config),
+	}
+	// 更新探针配置
+	return s.agentRepo.UpdateById(ctx, &agentForUpdate)
 }

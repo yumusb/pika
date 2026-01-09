@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,7 +10,9 @@ import (
 	"github.com/dushixiang/pika/internal/protocol"
 	"github.com/dushixiang/pika/internal/repo"
 	"github.com/dushixiang/pika/internal/websocket"
+
 	"go.uber.org/zap"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -38,46 +39,33 @@ func NewSSHLoginService(logger *zap.Logger, db *gorm.DB, wsManager *websocket.Ma
 // === 配置管理 ===
 
 // GetConfig 获取探针的配置
-func (s *SSHLoginService) GetConfig(agentID string) (*models.SSHLoginConfigData, error) {
-	config, err := s.agentRepo.GetSSHLoginConfig(context.Background(), agentID)
+func (s *SSHLoginService) GetConfig(ctx context.Context, agentID string) (*models.SSHLoginConfigData, error) {
+	agent, err := s.agentRepo.FindById(ctx, agentID)
 	if err != nil {
 		return nil, err
 	}
-	return config, nil
+	config := agent.SSHLoginConfig.Data()
+	return &config, nil
 }
 
 // UpdateConfig 更新配置并下发到 Agent
-// 返回: config - 配置对象, configSent - 是否成功下发到 Agent, error - 错误信息
-func (s *SSHLoginService) UpdateConfig(ctx context.Context, agentID string, enabled bool) (*models.SSHLoginConfigData, bool, error) {
-	// 检查探针是否存在
-	agent, err := s.agentRepo.FindById(ctx, agentID)
-	if err != nil {
-		return nil, false, fmt.Errorf("探针不存在")
-	}
-
+// 返回: config - 配置对象, error - 错误信息
+func (s *SSHLoginService) UpdateConfig(ctx context.Context, agentID string, enabled bool) error {
 	// 保存配置到数据库
-	config := &models.SSHLoginConfigData{
+	config := models.SSHLoginConfigData{
 		Enabled: enabled,
 	}
 
-	if err := s.agentRepo.UpdateSSHLoginConfig(ctx, agentID, config); err != nil {
-		return nil, false, err
+	var agentForUpdate = models.Agent{
+		ID:             agentID,
+		SSHLoginConfig: datatypes.NewJSONType(config),
+	}
+	if err := s.agentRepo.UpdateById(ctx, &agentForUpdate); err != nil {
+		return err
 	}
 
 	// 下发配置到 Agent
-	configSent := false
-	if agent.Status == 1 { // 仅在探针在线时尝试下发
-		if err := s.sendConfigToAgent(agentID, enabled); err != nil {
-			s.logger.Warn("下发SSH登录监控配置到Agent失败", zap.Error(err), zap.String("agentId", agentID))
-		} else {
-			s.logger.Info("成功下发SSH登录监控配置", zap.String("agentId", agentID), zap.Bool("enabled", enabled))
-			configSent = true
-		}
-	} else {
-		s.logger.Info("探针离线，配置将在下次连接时生效", zap.String("agentId", agentID))
-	}
-
-	return config, configSent, nil
+	return s.sendConfigToAgent(agentID, enabled)
 }
 
 // sendConfigToAgent 下发配置到 Agent
@@ -100,15 +88,11 @@ func (s *SSHLoginService) sendConfigToAgent(agentID string, enabled bool) error 
 }
 
 // HandleConfigResult 处理 Agent 上报的配置应用结果
-func (s *SSHLoginService) HandleConfigResult(agentID string, result protocol.SSHLoginConfigResult) error {
+func (s *SSHLoginService) HandleConfigResult(ctx context.Context, agentID string, result protocol.SSHLoginConfigResult) error {
 	// 获取现有配置
-	config, err := s.agentRepo.GetSSHLoginConfig(context.Background(), agentID)
+	config, err := s.GetConfig(ctx, agentID)
 	if err != nil {
 		return fmt.Errorf("获取配置失败: %w", err)
-	}
-	if config == nil {
-		s.logger.Warn("收到配置应用结果，但配置不存在", zap.String("agentId", agentID))
-		return nil
 	}
 
 	// 更新配置应用状态
@@ -120,24 +104,11 @@ func (s *SSHLoginService) HandleConfigResult(agentID string, result protocol.SSH
 	config.ApplyStatus = status
 	config.ApplyMessage = result.Message
 
-	if err := s.agentRepo.UpdateSSHLoginConfig(context.Background(), agentID, config); err != nil {
-		s.logger.Error("更新配置应用状态失败", zap.Error(err), zap.String("agentId", agentID))
-		return err
+	var agentForUpdate = models.Agent{
+		ID:             agentID,
+		SSHLoginConfig: datatypes.NewJSONType(*config),
 	}
-
-	// 记录日志
-	if result.Success {
-		s.logger.Info("Agent成功应用SSH登录监控配置",
-			zap.String("agentId", agentID),
-			zap.Bool("enabled", result.Enabled),
-			zap.String("message", result.Message))
-	} else {
-		s.logger.Warn("Agent应用SSH登录监控配置失败",
-			zap.String("agentId", agentID),
-			zap.String("message", result.Message))
-	}
-
-	return nil
+	return s.agentRepo.UpdateById(ctx, &agentForUpdate)
 }
 
 // === 事件处理 ===
@@ -145,8 +116,8 @@ func (s *SSHLoginService) HandleConfigResult(agentID string, result protocol.SSH
 // HandleEvent 处理 Agent 上报的事件
 func (s *SSHLoginService) HandleEvent(ctx context.Context, agentID string, eventData protocol.SSHLoginEvent) error {
 	// 检查是否启用监控
-	config, err := s.agentRepo.GetSSHLoginConfig(ctx, agentID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	config, err := s.GetConfig(ctx, agentID)
+	if err != nil {
 		return err
 	}
 

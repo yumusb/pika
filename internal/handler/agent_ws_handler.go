@@ -86,10 +86,10 @@ func (h *AgentHandler) handleWebSocketMessage(ctx context.Context, agentID strin
 		return h.handleSSHLoginEventMessage(ctx, agentID, data)
 
 	case protocol.MessageTypeSSHLoginConfigResult:
-		return h.handleSSHLoginConfigResultMessage(agentID, data)
+		return h.handleSSHLoginConfigResultMessage(ctx, agentID, data)
 
 	case protocol.MessageTypeTamperProtect:
-		return h.handleTamperProtectMessage(agentID, data)
+		return h.handleTamperProtectMessage(ctx, agentID, data)
 
 	default:
 		h.logger.Warn("unknown message type", zap.String("type", messageType))
@@ -192,34 +192,22 @@ func (h *AgentHandler) handleSSHLoginEventMessage(ctx context.Context, agentID s
 	return h.sshLoginService.HandleEvent(ctx, agentID, eventData)
 }
 
-func (h *AgentHandler) handleSSHLoginConfigResultMessage(agentID string, data json.RawMessage) error {
+func (h *AgentHandler) handleSSHLoginConfigResultMessage(ctx context.Context, agentID string, data json.RawMessage) error {
 	var resultData protocol.SSHLoginConfigResult
 	if err := json.Unmarshal(data, &resultData); err != nil {
 		h.logger.Error("failed to unmarshal ssh login config result", zap.Error(err))
 		return err
 	}
-	return h.sshLoginService.HandleConfigResult(agentID, resultData)
+	return h.sshLoginService.HandleConfigResult(ctx, agentID, resultData)
 }
 
-func (h *AgentHandler) handleTamperProtectMessage(agentID string, data json.RawMessage) error {
+func (h *AgentHandler) handleTamperProtectMessage(ctx context.Context, agentID string, data json.RawMessage) error {
 	var protectResp protocol.TamperProtectResponse
 	if err := json.Unmarshal(data, &protectResp); err != nil {
 		h.logger.Error("failed to unmarshal tamper protect response", zap.Error(err))
 		return err
 	}
-	if protectResp.Success {
-		h.logger.Info("tamper protect config applied successfully",
-			zap.String("agentID", agentID),
-			zap.String("message", protectResp.Message),
-			zap.Int("current_paths", len(protectResp.Paths)),
-			zap.Int("added", len(protectResp.Added)),
-			zap.Int("removed", len(protectResp.Removed)))
-	} else {
-		h.logger.Error("tamper protect config apply failed",
-			zap.String("agentID", agentID),
-			zap.String("message", protectResp.Message))
-	}
-	return nil
+	return h.tamperService.HandleConfigResult(ctx, agentID, protectResp)
 }
 
 // sendRegisterSuccess 发送注册成功响应
@@ -249,24 +237,16 @@ func (h *AgentHandler) sendRegisterError(conn *websocket.Conn, errMsg string) er
 
 // sendTamperConfig 发送防篡改配置（探针初始化时发送完整配置作为新增）
 func (h *AgentHandler) sendTamperConfig(conn *websocket.Conn, agentID string) error {
-	// 获取探针的防篡改配置
-	config, err := h.tamperService.GetConfigByAgentID(agentID)
+	// 使用 TamperService 构建初始配置（复用逻辑，会自动判断 enabled 状态）
+	added, removed, err := h.tamperService.BuildInitialConfig(context.Background(), agentID)
 	if err != nil {
 		return err
 	}
 
-	// 构建配置数据 - 将完整配置作为新增发送（探针刚连接，所有路径都是新增）
-	var paths []string
-	if config != nil && len(config.Paths) > 0 {
-		paths = config.Paths
-	} else {
-		paths = []string{} // 空列表
-	}
-
-	// 使用增量配置格式，将所有路径作为新增
+	// 使用增量配置格式
 	configData := protocol.TamperProtectConfig{
-		Added:   paths,
-		Removed: []string{}, // 初始化时没有需要移除的
+		Added:   added,
+		Removed: removed,
 	}
 
 	msgData, err := json.Marshal(protocol.OutboundMessage{

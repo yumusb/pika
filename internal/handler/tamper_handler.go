@@ -38,7 +38,7 @@ func (h *TamperHandler) UpdateTamperConfig(c echo.Context) error {
 		})
 	}
 
-	config, err := h.tamperService.UpdateConfig(agentID, req.Enabled, req.Paths)
+	err := h.tamperService.UpdateConfig(c.Request().Context(), agentID, req.Enabled, req.Paths)
 	if err != nil {
 		h.logger.Error("更新防篡改配置失败", zap.Error(err), zap.String("agentId", agentID))
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
@@ -46,7 +46,7 @@ func (h *TamperHandler) UpdateTamperConfig(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, config)
+	return c.JSON(http.StatusOK, orz.Map{})
 }
 
 // GetTamperConfig 获取探针的防篡改配置
@@ -54,7 +54,7 @@ func (h *TamperHandler) UpdateTamperConfig(c echo.Context) error {
 func (h *TamperHandler) GetTamperConfig(c echo.Context) error {
 	agentID := c.Param("id")
 
-	config, err := h.tamperService.GetConfigByAgentID(agentID)
+	config, err := h.tamperService.GetConfigByAgentID(c.Request().Context(), agentID)
 	if err != nil {
 		h.logger.Error("获取防篡改配置失败", zap.Error(err), zap.String("agentId", agentID))
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{

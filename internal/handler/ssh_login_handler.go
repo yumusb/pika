@@ -34,18 +34,11 @@ func (h *SSHLoginHandler) GetConfig(c echo.Context) error {
 		})
 	}
 
-	config, err := h.service.GetConfig(agentID)
+	config, err := h.service.GetConfig(c.Request().Context(), agentID)
 	if err != nil {
 		h.logger.Error("获取SSH登录监控配置失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"message": "获取配置失败",
-		})
-	}
-
-	if config == nil {
-		// 返回默认配置
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"enabled": false,
 		})
 	}
 
@@ -72,7 +65,7 @@ func (h *SSHLoginHandler) UpdateConfig(c echo.Context) error {
 		})
 	}
 
-	config, configSent, err := h.service.UpdateConfig(c.Request().Context(), agentID, req.Enabled)
+	err := h.service.UpdateConfig(c.Request().Context(), agentID, req.Enabled)
 	if err != nil {
 		h.logger.Error("更新SSH登录监控配置失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -80,19 +73,7 @@ func (h *SSHLoginHandler) UpdateConfig(c echo.Context) error {
 		})
 	}
 
-	// 根据下发状态返回不同的消息
-	message := "配置已保存"
-	if configSent {
-		message = "配置已保存并成功下发到探针"
-	} else {
-		message = "配置已保存，将在探针下次连接时生效"
-	}
-
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":    message,
-		"config":     config,
-		"configSent": configSent, // 告知前端配置是否成功下发
-	})
+	return c.JSON(http.StatusOK, orz.Map{})
 }
 
 // ListEvents 查询SSH登录事件

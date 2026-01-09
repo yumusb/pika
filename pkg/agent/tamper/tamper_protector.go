@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
@@ -344,17 +345,34 @@ func (p *Protector) initWatcher(ctx context.Context) error {
 
 // addPath 添加目录保护(内部方法,不加锁)
 func (p *Protector) addPath(path string) error {
-	// 设置不可变属性
-	if err := p.setImmutable(path, true); err != nil {
-		return fmt.Errorf("设置目录不可变属性失败: %w", err)
+	// 检查路径是否存在
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("无法访问路径: %w", err)
+	}
+
+	// 如果是目录，递归设置所有文件和子目录的不可变属性
+	if info.IsDir() {
+		if err := p.setImmutableRecursive(path, true); err != nil {
+			return fmt.Errorf("递归设置目录不可变属性失败: %w", err)
+		}
+	} else {
+		// 单个文件，直接设置不可变属性
+		if err := p.setImmutable(path, true); err != nil {
+			return fmt.Errorf("设置文件不可变属性失败: %w", err)
+		}
 	}
 
 	// 添加到监控
 	if p.watcher != nil {
 		if err := p.watcher.Add(path); err != nil {
 			// 如果添加监控失败,尝试回滚不可变属性
-			_ = p.setImmutable(path, false)
-			return fmt.Errorf("添加目录到监控失败: %w", err)
+			if info.IsDir() {
+				_ = p.setImmutableRecursive(path, false)
+			} else {
+				_ = p.setImmutable(path, false)
+			}
+			return fmt.Errorf("添加路径到监控失败: %w", err)
 		}
 	}
 
@@ -366,14 +384,32 @@ func (p *Protector) removePath(path string) error {
 	// 从监控中移除
 	if p.watcher != nil {
 		if err := p.watcher.Remove(path); err != nil {
-			slog.Warn("从监控中移除目录失败", "error", err)
+			slog.Warn("从监控中移除路径失败", "error", err)
 			// 继续执行,不返回错误
 		}
 	}
 
-	// 移除不可变属性
-	if err := p.setImmutable(path, false); err != nil {
-		return fmt.Errorf("移除目录不可变属性失败: %w", err)
+	// 检查路径是否存在
+	info, err := os.Stat(path)
+	if err != nil {
+		// 如果路径不存在，不报错，直接返回
+		if os.IsNotExist(err) {
+			slog.Info("路径已不存在，跳过移除属性", "path", path)
+			return nil
+		}
+		return fmt.Errorf("无法访问路径: %w", err)
+	}
+
+	// 如果是目录，递归移除所有文件和子目录的不可变属性
+	if info.IsDir() {
+		if err := p.setImmutableRecursive(path, false); err != nil {
+			return fmt.Errorf("递归移除目录不可变属性失败: %w", err)
+		}
+	} else {
+		// 单个文件，直接移除不可变属性
+		if err := p.setImmutable(path, false); err != nil {
+			return fmt.Errorf("移除文件不可变属性失败: %w", err)
+		}
 	}
 
 	return nil
@@ -517,6 +553,48 @@ func (p *Protector) checkImmutable(path string) (bool, error) {
 
 	// 使用 chattr.go 中的 IsAttr 函数检查不可变属性
 	return IsAttr(f, FS_IMMUTABLE_FL)
+}
+
+// setImmutableRecursive 递归设置或移除目录及其所有子文件/子目录的不可变属性
+func (p *Protector) setImmutableRecursive(rootPath string, immutable bool) error {
+	var lastErr error
+	var errCount int
+
+	// 使用 filepath.Walk 遍历目录树
+	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			slog.Warn("访问路径失败", "path", path, "error", err)
+			lastErr = err
+			errCount++
+			return nil // 继续处理其他文件
+		}
+
+		// 设置不可变属性
+		if setErr := p.setImmutable(path, immutable); setErr != nil {
+			slog.Warn("设置不可变属性失败", "path", path, "immutable", immutable, "error", setErr)
+			lastErr = setErr
+			errCount++
+			return nil // 继续处理其他文件
+		}
+
+		if immutable {
+			slog.Debug("已设置不可变属性", "path", path)
+		} else {
+			slog.Debug("已移除不可变属性", "path", path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("遍历目录失败: %w", err)
+	}
+
+	if errCount > 0 {
+		return fmt.Errorf("部分文件处理失败，共 %d 个错误，最后一个错误: %w", errCount, lastErr)
+	}
+
+	return nil
 }
 
 // setImmutable 设置或移除文件/目录的不可变属性
