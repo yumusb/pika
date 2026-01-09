@@ -263,3 +263,18 @@ func (h *DDNSHandler) GetRecords(c echo.Context) error {
 		"total": len(records),
 	})
 }
+
+// TriggerUpdate 手动触发 DDNS 更新
+func (h *DDNSHandler) TriggerUpdate(c echo.Context) error {
+	id := c.Param("id")
+	ctx := c.Request().Context()
+
+	if err := h.ddnsService.TriggerUpdate(ctx, id); err != nil {
+		h.logger.Error("failed to trigger ddns update", zap.Error(err))
+		return err
+	}
+
+	return orz.Ok(c, orz.Map{
+		"message": "DDNS 更新触发成功，探针将在几秒内上报 IP 并更新记录",
+	})
+}

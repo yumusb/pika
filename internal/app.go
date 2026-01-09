@@ -294,6 +294,7 @@ func setupApi(app *orz.App, components *AppComponents) {
 		adminApi.POST("/ddns/:id/enable", components.DDNSHandler.Enable)
 		adminApi.POST("/ddns/:id/disable", components.DDNSHandler.Disable)
 		adminApi.GET("/ddns/:id/records", components.DDNSHandler.GetRecords)
+		adminApi.POST("/ddns/:id/trigger", components.DDNSHandler.TriggerUpdate)
 	}
 
 	// OIDC 认证路由（如果启用）

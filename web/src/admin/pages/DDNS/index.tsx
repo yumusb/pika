@@ -6,7 +6,7 @@ import {PageHeader} from '@admin/components';
 import {Globe, Plus, Settings} from 'lucide-react';
 import dayjs from 'dayjs';
 import type {DDNSConfig} from '@/types';
-import {deleteDDNSConfig, disableDDNSConfig, enableDDNSConfig, getDDNSConfigs,} from '@/api/ddns';
+import {deleteDDNSConfig, disableDDNSConfig, enableDDNSConfig, getDDNSConfigs, triggerDDNSUpdate,} from '@/api/ddns';
 import {getErrorMessage} from '@/lib/utils';
 import DDNSModal from './DDNSModal.tsx';
 import RecordsDrawer from './RecordsDrawer.tsx';
@@ -67,6 +67,15 @@ const DDNSPage = () => {
                 }
             },
         });
+    };
+
+    const handleTrigger = async (config: DDNSConfig) => {
+        try {
+            await triggerDDNSUpdate(config.id);
+            message.success('DDNS 更新触发成功，探针将在几秒内上报 IP 并更新记录');
+        } catch (error: unknown) {
+            message.error(getErrorMessage(error, '触发失败'));
+        }
     };
 
     const providerNames: Record<string, string> = {
@@ -152,7 +161,7 @@ const DDNSPage = () => {
         {
             title: '操作',
             valueType: 'option',
-            width: 200,
+            width: 240,
             render: (_, record) => [
                 <Button
                     key="records"
@@ -162,6 +171,16 @@ const DDNSPage = () => {
                     onClick={() => handleViewRecords(record)}
                 >
                     记录
+                </Button>,
+                <Button
+                    key="trigger"
+                    type="link"
+                    size="small"
+                    style={{margin: 0, padding: 0}}
+                    onClick={() => handleTrigger(record)}
+                    disabled={!record.enabled}
+                >
+                    触发
                 </Button>,
                 <Button
                     key="toggle"
