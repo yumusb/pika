@@ -1,8 +1,8 @@
 package handler
 
 import (
+	"context"
 	"net/http"
-	"strconv"
 
 	"github.com/dushixiang/pika/internal/service"
 	"github.com/go-orz/orz"
@@ -45,8 +45,7 @@ func (h *SSHLoginHandler) GetConfig(c echo.Context) error {
 	if config == nil {
 		// 返回默认配置
 		return c.JSON(http.StatusOK, map[string]interface{}{
-			"enabled":      false,
-			"recordFailed": true,
+			"enabled": false,
 		})
 	}
 
@@ -100,55 +99,23 @@ func (h *SSHLoginHandler) UpdateConfig(c echo.Context) error {
 // GET /api/agents/:id/ssh-login/events
 func (h *SSHLoginHandler) ListEvents(c echo.Context) error {
 	agentID := c.Param("id")
-	if agentID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"message": "探针ID不能为空",
-		})
-	}
 
-	// 解析分页参数
-	page, _ := strconv.Atoi(c.QueryParam("page"))
-	if page < 1 {
-		page = 1
-	}
+	// 获取分页参数
+	pageReq := orz.GetPageRequest(c)
+	builder := orz.NewPageBuilder(h.service.SSHLoginEventRepo.Repository).
+		PageRequest(pageReq).
+		Equal("agentId", agentID).
+		Equal("username", c.QueryParam("username")).
+		Equal("ip", c.QueryParam("ip")).
+		Equal("status", c.QueryParam("status"))
 
-	pageSize, _ := strconv.Atoi(c.QueryParam("pageSize"))
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-
-	// 解析过滤参数
-	username := c.QueryParam("username")
-	ip := c.QueryParam("ip")
-	status := c.QueryParam("status")
-
-	startTime, _ := strconv.ParseInt(c.QueryParam("startTime"), 10, 64)
-	endTime, _ := strconv.ParseInt(c.QueryParam("endTime"), 10, 64)
-
-	// 查询事件
-	var events interface{}
-	var total int64
-	var err error
-
-	if username != "" || ip != "" || status != "" || startTime > 0 || endTime > 0 {
-		events, total, err = h.service.ListEventsByFilter(agentID, username, ip, status, startTime, endTime, page, pageSize)
-	} else {
-		events, total, err = h.service.ListEvents(agentID, page, pageSize)
-	}
-
+	ctx := context.Background()
+	page, err := builder.Execute(ctx)
 	if err != nil {
-		h.logger.Error("查询SSH登录事件失败", zap.Error(err))
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"message": "查询失败",
-		})
+		return err
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
-		"items":    events,
-		"total":    total,
-		"page":     page,
-		"pageSize": pageSize,
-	})
+	return orz.Ok(c, page)
 }
 
 // GetEvent 获取单个SSH登录事件
@@ -161,7 +128,8 @@ func (h *SSHLoginHandler) GetEvent(c echo.Context) error {
 		})
 	}
 
-	event, err := h.service.GetEventByID(eventID)
+	ctx := context.Background()
+	event, exists, err := h.service.SSHLoginEventRepo.FindByIdExists(ctx, eventID)
 	if err != nil {
 		h.logger.Error("获取SSH登录事件失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
@@ -169,7 +137,7 @@ func (h *SSHLoginHandler) GetEvent(c echo.Context) error {
 		})
 	}
 
-	if event == nil {
+	if !exists {
 		return c.JSON(http.StatusNotFound, map[string]string{
 			"message": "事件不存在",
 		})
@@ -182,18 +150,14 @@ func (h *SSHLoginHandler) GetEvent(c echo.Context) error {
 // DELETE /api/agents/:id/ssh-login/events
 func (h *SSHLoginHandler) DeleteEvents(c echo.Context) error {
 	agentID := c.Param("id")
-	if agentID == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{
-			"message": "探针ID不能为空",
-		})
-	}
 
-	if err := h.service.DeleteEventsByAgentID(agentID); err != nil {
+	ctx := context.Background()
+	if err := h.service.DeleteEventsByAgentID(ctx, agentID); err != nil {
 		h.logger.Error("删除SSH登录事件失败", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{
 			"message": "删除失败",
 		})
 	}
 
-	return c.JSON(http.StatusOK, orz.Map{})
+	return orz.Ok(c, orz.Map{})
 }

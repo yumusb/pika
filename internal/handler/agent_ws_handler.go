@@ -83,7 +83,7 @@ func (h *AgentHandler) handleWebSocketMessage(ctx context.Context, agentID strin
 		return h.handleDDNSIPReportMessage(ctx, agentID, data)
 
 	case protocol.MessageTypeSSHLoginEvent:
-		return h.handleSSHLoginEventMessage(agentID, data)
+		return h.handleSSHLoginEventMessage(ctx, agentID, data)
 
 	case protocol.MessageTypeSSHLoginConfigResult:
 		return h.handleSSHLoginConfigResultMessage(agentID, data)
@@ -183,13 +183,13 @@ func (h *AgentHandler) handleDDNSIPReportMessage(ctx context.Context, agentID st
 	return h.ddnsService.HandleIPReport(ctx, agentID, &ipReport)
 }
 
-func (h *AgentHandler) handleSSHLoginEventMessage(agentID string, data json.RawMessage) error {
+func (h *AgentHandler) handleSSHLoginEventMessage(ctx context.Context, agentID string, data json.RawMessage) error {
 	var eventData protocol.SSHLoginEvent
 	if err := json.Unmarshal(data, &eventData); err != nil {
 		h.logger.Error("failed to unmarshal ssh login event", zap.Error(err))
 		return err
 	}
-	return h.sshLoginService.HandleEvent(agentID, eventData)
+	return h.sshLoginService.HandleEvent(ctx, agentID, eventData)
 }
 
 func (h *AgentHandler) handleSSHLoginConfigResultMessage(agentID string, data json.RawMessage) error {

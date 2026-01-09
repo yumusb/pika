@@ -147,7 +147,7 @@ const SSHLoginEvents: React.FC<SSHLoginEventsProps> = ({agentId}) => {
             request={async (params) => {
                 try {
                     const response = await getSSHLoginEvents(agentId, {
-                        page: params.current || 1,
+                        pageIndex: params.current || 1,
                         pageSize: params.pageSize || 20,
                         username: params.username,
                         ip: params.ip,

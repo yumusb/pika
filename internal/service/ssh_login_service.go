@@ -17,21 +17,21 @@ import (
 
 // SSHLoginService SSH登录服务
 type SSHLoginService struct {
-	logger    *zap.Logger
-	repo      *repo.SSHLoginRepo
-	agentRepo *repo.AgentRepo
-	wsManager *websocket.Manager
-	geoIPSvc  *GeoIPService
+	logger            *zap.Logger
+	SSHLoginEventRepo *repo.SSHLoginEventRepo
+	agentRepo         *repo.AgentRepo
+	wsManager         *websocket.Manager
+	geoIPSvc          *GeoIPService
 }
 
 // NewSSHLoginService 创建服务
 func NewSSHLoginService(logger *zap.Logger, db *gorm.DB, wsManager *websocket.Manager, geoIPSvc *GeoIPService) *SSHLoginService {
 	return &SSHLoginService{
-		logger:    logger,
-		repo:      repo.NewSSHLoginRepo(db),
-		agentRepo: repo.NewAgentRepo(db),
-		wsManager: wsManager,
-		geoIPSvc:  geoIPSvc,
+		logger:            logger,
+		SSHLoginEventRepo: repo.NewSSHLoginEventRepo(db),
+		agentRepo:         repo.NewAgentRepo(db),
+		wsManager:         wsManager,
+		geoIPSvc:          geoIPSvc,
 	}
 }
 
@@ -140,17 +140,12 @@ func (s *SSHLoginService) HandleConfigResult(agentID string, result protocol.SSH
 	return nil
 }
 
-// getCurrentTimestamp 获取当前时间戳（毫秒）
-func getCurrentTimestamp() int64 {
-	return time.Now().UnixMilli()
-}
-
 // === 事件处理 ===
 
 // HandleEvent 处理 Agent 上报的事件
-func (s *SSHLoginService) HandleEvent(agentID string, eventData protocol.SSHLoginEvent) error {
+func (s *SSHLoginService) HandleEvent(ctx context.Context, agentID string, eventData protocol.SSHLoginEvent) error {
 	// 检查是否启用监控
-	config, err := s.agentRepo.GetSSHLoginConfig(context.Background(), agentID)
+	config, err := s.agentRepo.GetSSHLoginConfig(ctx, agentID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
@@ -162,7 +157,7 @@ func (s *SSHLoginService) HandleEvent(agentID string, eventData protocol.SSHLogi
 	}
 
 	// 去重检查（避免 Agent 重启时重复上报）
-	existing, err := s.repo.FindEventByTimestamp(agentID, eventData.Timestamp, 5000) // 5秒容差
+	existing, err := s.SSHLoginEventRepo.FindEventByTimestamp(ctx, agentID, eventData.Timestamp, 5000) // 5秒容差
 	if err != nil {
 		s.logger.Warn("查询事件去重失败", zap.Error(err))
 	} else if existing != nil {
@@ -181,9 +176,10 @@ func (s *SSHLoginService) HandleEvent(agentID string, eventData protocol.SSHLogi
 		TTY:       eventData.TTY,
 		SessionID: eventData.SessionID,
 		Timestamp: eventData.Timestamp,
+		CreatedAt: time.Now().UnixMilli(),
 	}
 
-	if err := s.repo.CreateEvent(event); err != nil {
+	if err := s.SSHLoginEventRepo.Create(ctx, event); err != nil {
 		s.logger.Error("保存SSH登录事件失败", zap.Error(err))
 		return err
 	}
@@ -199,59 +195,25 @@ func (s *SSHLoginService) HandleEvent(agentID string, eventData protocol.SSHLogi
 
 // === 事件查询 ===
 
-// ListEvents 查询登录事件（分页）
-func (s *SSHLoginService) ListEvents(agentID string, page, pageSize int) ([]models.SSHLoginEvent, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-
-	return s.repo.ListEventsByAgentID(agentID, page, pageSize)
-}
-
-// ListEventsByFilter 按条件查询事件
-func (s *SSHLoginService) ListEventsByFilter(agentID, username, ip, status string, startTime, endTime int64, page, pageSize int) ([]models.SSHLoginEvent, int64, error) {
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-
-	return s.repo.ListEventsByFilter(agentID, username, ip, status, startTime, endTime, page, pageSize)
-}
-
-// GetEventByID 根据ID获取事件
-func (s *SSHLoginService) GetEventByID(id string) (*models.SSHLoginEvent, error) {
-	return s.repo.GetEventByID(id)
-}
-
 // DeleteEventsByAgentID 删除探针的所有事件
-func (s *SSHLoginService) DeleteEventsByAgentID(agentID string) error {
-	return s.repo.DeleteEventsByAgentID(agentID)
+func (s *SSHLoginService) DeleteEventsByAgentID(ctx context.Context, agentID string) error {
+	return s.SSHLoginEventRepo.DeleteEventsByAgentID(ctx, agentID)
 }
 
 // CleanupOldEvents 清理旧事件（定期任务）
-func (s *SSHLoginService) CleanupOldEvents(days int) error {
+func (s *SSHLoginService) CleanupOldEvents(ctx context.Context, days int) error {
 	if days < 1 {
 		days = 90 // 默认保留90天
 	}
 
-	timestamp := (int64(days) * 24 * 60 * 60 * 1000)
-	cutoff := s.getCurrentTimestamp() - timestamp
+	timestamp := int64(days) * 24 * 60 * 60 * 1000
+	cutoff := time.Now().UnixMilli() - timestamp
 
-	if err := s.repo.DeleteEventsBefore(cutoff); err != nil {
+	if err := s.SSHLoginEventRepo.DeleteOldEvents(ctx, cutoff); err != nil {
 		s.logger.Error("清理SSH登录事件失败", zap.Error(err), zap.Int("days", days))
 		return err
 	}
 
 	s.logger.Info("成功清理SSH登录事件", zap.Int("days", days))
 	return nil
-}
-
-// getCurrentTimestamp 获取当前时间戳（毫秒）
-func (s *SSHLoginService) getCurrentTimestamp() int64 {
-	return 0 // 实际应该返回 time.Now().UnixMilli()，这里简化
 }

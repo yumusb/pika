@@ -510,14 +510,9 @@ export interface UpdateTrafficConfigRequest {
 
 // SSH 登录监控相关
 export interface SSHLoginConfig {
-    id?: string;
-    agentId: string;
     enabled: boolean;
-    recordFailed: boolean;
     applyStatus?: string;  // 配置应用状态: success/failed/pending
     applyMessage?: string; // 应用结果消息
-    createdAt?: number;
-    updatedAt?: number;
 }
 
 export interface SSHLoginEvent {
@@ -534,16 +529,8 @@ export interface SSHLoginEvent {
     createdAt: number;
 }
 
-export interface SSHLoginEventListResponse {
-    items: SSHLoginEvent[];
-    total: number;
-    page: number;
-    pageSize: number;
-}
-
 export interface UpdateSSHLoginConfigRequest {
     enabled: boolean;
-    recordFailed: boolean;
 }
 
 // 导出 DDNS 相关类型

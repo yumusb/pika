@@ -3,7 +3,7 @@ import type {
     Agent,
     LatestMetrics,
     SSHLoginConfig,
-    SSHLoginEventListResponse,
+    SSHLoginEvent,
     TrafficStats,
     UpdateSSHLoginConfigRequest,
     UpdateTrafficConfigRequest
@@ -554,7 +554,7 @@ export const updateSSHLoginConfig = async (agentId: string, data: UpdateSSHLogin
 
 // 获取 SSH 登录事件列表
 export interface GetSSHLoginEventsParams {
-    page?: number;
+    pageIndex?: number;
     pageSize?: number;
     username?: string;
     ip?: string;
@@ -565,7 +565,7 @@ export interface GetSSHLoginEventsParams {
 
 export const getSSHLoginEvents = async (agentId: string, params?: GetSSHLoginEventsParams) => {
     const query = new URLSearchParams();
-    if (params?.page) query.append('page', params.page.toString());
+    if (params?.pageIndex) query.append('pageIndex', params.pageIndex.toString());
     if (params?.pageSize) query.append('pageSize', params.pageSize.toString());
     if (params?.username) query.append('username', params.username);
     if (params?.ip) query.append('ip', params.ip);
@@ -573,7 +573,7 @@ export const getSSHLoginEvents = async (agentId: string, params?: GetSSHLoginEve
     if (params?.startTime) query.append('startTime', params.startTime.toString());
     if (params?.endTime) query.append('endTime', params.endTime.toString());
 
-    const response = await get<SSHLoginEventListResponse>(`/admin/agents/${agentId}/ssh-login/events?${query.toString()}`);
+    const response = await get<{ items: SSHLoginEvent[]; total: number }>(`/admin/agents/${agentId}/ssh-login/events?${query.toString()}`);
     return response.data;
 };
 

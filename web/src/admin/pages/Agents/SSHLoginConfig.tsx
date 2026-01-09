@@ -27,7 +27,6 @@ const SSHLoginConfig: React.FC<SSHLoginConfigProps> = ({agentId}) => {
             const values = form.getFieldsValue();
             return updateSSHLoginConfig(agentId, {
                 enabled: values.enabled,
-                recordFailed: values.recordFailed,
             });
         },
         onSuccess: () => {
@@ -45,12 +44,10 @@ const SSHLoginConfig: React.FC<SSHLoginConfigProps> = ({agentId}) => {
         if (config) {
             form.setFieldsValue({
                 enabled: config.enabled || false,
-                recordFailed: config.recordFailed !== undefined ? config.recordFailed : true,
             });
         } else {
             form.setFieldsValue({
                 enabled: false,
-                recordFailed: true,
             });
         }
     }, [config, form]);
@@ -81,7 +78,6 @@ const SSHLoginConfig: React.FC<SSHLoginConfigProps> = ({agentId}) => {
                     layout="vertical"
                     initialValues={{
                         enabled: false,
-                        recordFailed: true,
                     }}
                 >
                     <Form.Item
@@ -93,18 +89,6 @@ const SSHLoginConfig: React.FC<SSHLoginConfigProps> = ({agentId}) => {
                         <Switch
                             checkedChildren="已启用"
                             unCheckedChildren="已禁用"
-                        />
-                    </Form.Item>
-
-                    <Form.Item
-                        label="记录失败登录"
-                        name="recordFailed"
-                        valuePropName="checked"
-                        extra={'是否记录失败的 SSH 登录尝试（有助于发现暴力破解攻击）'}
-                    >
-                        <Switch
-                            checkedChildren="记录"
-                            unCheckedChildren="不记录"
                         />
                     </Form.Item>
                 </Form>
