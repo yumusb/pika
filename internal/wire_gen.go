@@ -41,7 +41,7 @@ func InitializeApp(logger *zap.Logger, db *gorm.DB, cfg *config.AppConfig) (*App
 	tamperService := service.NewTamperService(logger, db, manager)
 	ddnsService := service.NewDDNSService(logger, db, propertyService, manager)
 	sshLoginService := service.NewSSHLoginService(logger, db, manager, geoIPService)
-	agentHandler := handler.NewAgentHandler(logger, agentService, metricService, monitorService, tamperService, ddnsService, sshLoginService, manager)
+	agentHandler := handler.NewAgentHandler(logger, agentService, trafficService, metricService, monitorService, tamperService, ddnsService, sshLoginService, manager)
 	apiKeyHandler := handler.NewApiKeyHandler(logger, apiKeyService)
 	notifier := service.NewNotifier(logger)
 	alertService := service.NewAlertService(logger, db, propertyService, monitorService, notifier)
@@ -64,6 +64,7 @@ func InitializeApp(logger *zap.Logger, db *gorm.DB, cfg *config.AppConfig) (*App
 		DDNSHandler:        ddnsHandler,
 		SSHLoginHandler:    sshLoginHandler,
 		AgentService:       agentService,
+		TrafficService:     trafficService,
 		MetricService:      metricService,
 		AlertService:       alertService,
 		PropertyService:    propertyService,
@@ -94,6 +95,7 @@ type AppComponents struct {
 	SSHLoginHandler    *handler.SSHLoginHandler
 
 	AgentService    *service.AgentService
+	TrafficService  *service.TrafficService
 	MetricService   *service.MetricService
 	AlertService    *service.AlertService
 	PropertyService *service.PropertyService

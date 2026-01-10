@@ -34,11 +34,13 @@ type Agent struct {
 // TrafficStatsData 流量统计数据
 type TrafficStatsData struct {
 	Enabled      bool   `json:"enabled"`      // 是否启用
+	Type         string `json:"type"`         // 统计类型: "recv"进站, "send"出站, "both"全部
 	Limit        uint64 `json:"limit"`        // 流量限额(字节), 0表示不限制
 	Used         uint64 `json:"used"`         // 当前周期已使用流量(字节)
 	ResetDay     int    `json:"resetDay"`     // 流量重置日期(1-31), 0表示不自动重置
 	PeriodStart  int64  `json:"periodStart"`  // 当前周期开始时间(时间戳毫秒)
 	BaselineRecv uint64 `json:"baselineRecv"` // 当前周期流量基线(BytesRecvTotal)
+	BaselineSend uint64 `json:"baselineSend"` // 当前周期流量基线(BytesSentTotal)
 	AlertSent80  bool   `json:"alertSent80"`  // 是否已发送80%告警
 	AlertSent90  bool   `json:"alertSent90"`  // 是否已发送90%告警
 	AlertSent100 bool   `json:"alertSent100"` // 是否已发送100%告警

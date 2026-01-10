@@ -74,6 +74,7 @@ type AppComponents struct {
 	SSHLoginHandler    *handler.SSHLoginHandler
 
 	AgentService    *service.AgentService
+	TrafficService  *service.TrafficService
 	MetricService   *service.MetricService
 	AlertService    *service.AlertService
 	PropertyService *service.PropertyService

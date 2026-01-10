@@ -46,11 +46,13 @@ export interface TrafficData {
 
 export interface TrafficStatsData {
     enabled: boolean;
+    type: string;         // 统计类型: recv进站/send出站/both全部
     limit: number;        // 流量限额(字节), 0表示不限制
     used: number;         // 当前周期已使用流量(字节)
     resetDay: number;     // 流量重置日期(1-31), 0表示不自动重置
     periodStart: number;  // 当前周期开始时间(时间戳毫秒)
-    baselineRecv: number; // 当前周期流量基线
+    baselineRecv: number; // 当前周期流量基线(接收)
+    baselineSend: number; // 当前周期流量基线(发送)
     alertSent80: boolean;
     alertSent90: boolean;
     alertSent100: boolean;
@@ -494,6 +496,7 @@ export interface TrafficAlerts {
 
 export interface TrafficStats {
     enabled: boolean;
+    type: string;      // 统计类型: recv进站/send出站/both全部
     limit: number;
     used: number;
     usedPercent: number;
@@ -507,7 +510,9 @@ export interface TrafficStats {
 
 export interface UpdateTrafficConfigRequest {
     enabled: boolean;  // 是否启用
+    type: string;      // 统计类型: recv进站/send出站/both全部
     limit: number;     // 流量限额(字节), 0表示不限制
+    used?: number;     // 手动设置已使用流量(可选)
     resetDay: number;  // 流量重置日期(1-31), 0表示不自动重置
 }
 

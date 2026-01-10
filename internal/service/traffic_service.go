@@ -27,7 +27,7 @@ func NewTrafficService(logger *zap.Logger, db *gorm.DB) *TrafficService {
 }
 
 // UpdateAgentTraffic 更新探针流量统计(每次上报网络指标时调用)
-func (s *TrafficService) UpdateAgentTraffic(ctx context.Context, agentID string, currentRecvTotal uint64) error {
+func (s *TrafficService) UpdateAgentTraffic(ctx context.Context, agentID string, currentRecvTotal, currentSentTotal uint64) error {
 	agent, err := s.agentRepo.FindById(ctx, agentID)
 	if err != nil {
 		return err
@@ -41,9 +41,15 @@ func (s *TrafficService) UpdateAgentTraffic(ctx context.Context, agentID string,
 		return nil
 	}
 
+	// 设置默认类型
+	if stats.Type == "" {
+		stats.Type = "recv" // 默认只统计进站流量，向后兼容
+	}
+
 	// 初始化基线(首次统计)
-	if stats.BaselineRecv == 0 {
+	if stats.BaselineRecv == 0 && stats.BaselineSend == 0 {
 		stats.BaselineRecv = currentRecvTotal
+		stats.BaselineSend = currentSentTotal
 		stats.Used = 0
 		if stats.PeriodStart == 0 {
 			stats.PeriodStart = time.Now().UnixMilli()
@@ -53,16 +59,38 @@ func (s *TrafficService) UpdateAgentTraffic(ctx context.Context, agentID string,
 	}
 
 	// 检测计数器重置(探针重启)
-	if currentRecvTotal < stats.BaselineRecv {
+	recvReset := currentRecvTotal < stats.BaselineRecv
+	sendReset := currentSentTotal < stats.BaselineSend
+
+	if recvReset || sendReset {
 		s.logger.Warn("检测到流量计数器重置",
 			zap.String("agentId", agentID),
-			zap.Uint64("baseline", stats.BaselineRecv),
-			zap.Uint64("current", currentRecvTotal))
-		stats.BaselineRecv = currentRecvTotal
+			zap.Uint64("baselineRecv", stats.BaselineRecv),
+			zap.Uint64("currentRecv", currentRecvTotal),
+			zap.Uint64("baselineSend", stats.BaselineSend),
+			zap.Uint64("currentSend", currentSentTotal))
+
+		if recvReset {
+			stats.BaselineRecv = currentRecvTotal
+		}
+		if sendReset {
+			stats.BaselineSend = currentSentTotal
+		}
 		// 保持 Used 不变,避免丢失已统计的流量
 	} else {
-		// 计算使用量
-		stats.Used = currentRecvTotal - stats.BaselineRecv
+		// 根据配置的类型计算使用量
+		switch stats.Type {
+		case "recv": // 只统计进站流量
+			stats.Used = currentRecvTotal - stats.BaselineRecv
+		case "send": // 只统计出站流量
+			stats.Used = currentSentTotal - stats.BaselineSend
+		case "both": // 统计全部流量
+			recvUsed := currentRecvTotal - stats.BaselineRecv
+			sendUsed := currentSentTotal - stats.BaselineSend
+			stats.Used = recvUsed + sendUsed
+		default: // 默认只统计进站流量
+			stats.Used = currentRecvTotal - stats.BaselineRecv
+		}
 	}
 
 	// 检查告警(如果配置了限额)
@@ -152,4 +180,253 @@ func formatBytes(bytes uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.2f %ciB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// UpdateTrafficConfig 更新流量配置
+// used: 如果大于0，则使用该值作为已使用流量；如果为0，则保持当前值或重置
+func (s *TrafficService) UpdateTrafficConfig(ctx context.Context, agentID string, enabled bool, trafficType string, limit uint64, resetDay int, used uint64) error {
+	if resetDay < 0 || resetDay > 31 {
+		return fmt.Errorf("重置日期必须在0-31之间")
+	}
+
+	// 验证流量类型
+	if trafficType != "" && trafficType != "recv" && trafficType != "send" && trafficType != "both" {
+		return fmt.Errorf("流量类型必须是 recv、send 或 both")
+	}
+
+	agent, err := s.agentRepo.FindById(ctx, agentID)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UnixMilli()
+	stats := agent.TrafficStats.Data()
+	oldResetDay := stats.ResetDay
+	oldEnabled := stats.Enabled
+	oldType := stats.Type
+
+	// 设置配置
+	stats.Enabled = enabled
+	stats.Limit = limit
+	stats.ResetDay = resetDay
+
+	// 设置流量类型（默认为 recv）
+	if trafficType != "" {
+		stats.Type = trafficType
+	} else if stats.Type == "" {
+		stats.Type = "recv" // 默认只统计进站流量
+	}
+
+	// 如果是首次启用、禁用后重新启用、修改重置日期或修改流量类型，重置流量统计
+	if (!oldEnabled && stats.Enabled) || (stats.Enabled && resetDay != oldResetDay) || (stats.Enabled && stats.PeriodStart == 0) || (stats.Enabled && oldType != stats.Type && oldType != "") {
+		stats.Used = 0
+		stats.PeriodStart = now
+		stats.BaselineRecv = 0 // 下次上报时会设置正确的基线
+		stats.BaselineSend = 0
+		stats.AlertSent80 = false
+		stats.AlertSent90 = false
+		stats.AlertSent100 = false
+	}
+
+	// 如果提供了 used 参数且大于 0，则使用该值
+	if used > 0 {
+		stats.Used = used
+	}
+
+	// 如果禁用流量统计，清空相关数据
+	if !stats.Enabled {
+		stats.Used = 0
+		stats.PeriodStart = 0
+		stats.BaselineRecv = 0
+		stats.BaselineSend = 0
+		stats.AlertSent80 = false
+		stats.AlertSent90 = false
+		stats.AlertSent100 = false
+	}
+
+	agent.TrafficStats = datatypes.NewJSONType(stats)
+	agent.UpdatedAt = now
+	return s.agentRepo.UpdateById(ctx, &agent)
+}
+
+// GetTrafficStats 获取流量统计信息
+func (s *TrafficService) GetTrafficStats(ctx context.Context, agentID string) (*TrafficStats, error) {
+	agent, err := s.agentRepo.FindById(ctx, agentID)
+	if err != nil {
+		return nil, err
+	}
+
+	trafficData := agent.TrafficStats.Data()
+
+	// 设置默认类型
+	trafficType := trafficData.Type
+	if trafficType == "" {
+		trafficType = "recv" // 默认只统计进站流量
+	}
+
+	stats := &TrafficStats{
+		Enabled:     trafficData.Enabled,
+		Type:        trafficType,
+		Limit:       trafficData.Limit,
+		Used:        trafficData.Used,
+		ResetDay:    trafficData.ResetDay,
+		PeriodStart: trafficData.PeriodStart,
+		Alerts: TrafficAlerts{
+			Sent80:  trafficData.AlertSent80,
+			Sent90:  trafficData.AlertSent90,
+			Sent100: trafficData.AlertSent100,
+		},
+	}
+
+	// 计算使用百分比
+	if trafficData.Limit > 0 {
+		stats.UsedPercent = float64(trafficData.Used) / float64(trafficData.Limit) * 100
+		if trafficData.Used < trafficData.Limit {
+			stats.Remaining = trafficData.Limit - trafficData.Used
+		} else {
+			stats.Remaining = 0
+		}
+	}
+
+	// 计算下次重置日期和剩余天数
+	if trafficData.ResetDay > 0 && trafficData.PeriodStart > 0 {
+		periodStart := time.UnixMilli(trafficData.PeriodStart)
+		nextReset := calculateNextResetDate(periodStart, trafficData.ResetDay)
+		stats.PeriodEnd = nextReset.UnixMilli()
+		stats.DaysUntilReset = int(time.Until(nextReset).Hours() / 24)
+		if stats.DaysUntilReset < 0 {
+			stats.DaysUntilReset = 0
+		}
+	}
+
+	return stats, nil
+}
+
+// ResetAgentTraffic 重置探针流量
+func (s *TrafficService) ResetAgentTraffic(ctx context.Context, agentID string) error {
+	agent, err := s.agentRepo.FindById(ctx, agentID)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UnixMilli()
+	stats := agent.TrafficStats.Data()
+
+	stats.Used = 0
+	stats.BaselineRecv = 0 // 下次上报时会设置正确的基线
+	stats.BaselineSend = 0
+	stats.PeriodStart = now
+	stats.AlertSent80 = false
+	stats.AlertSent90 = false
+	stats.AlertSent100 = false
+
+	agent.TrafficStats = datatypes.NewJSONType(stats)
+	agent.UpdatedAt = now
+
+	s.logger.Info("探针流量已重置",
+		zap.String("agentId", agentID),
+		zap.String("agentName", agent.Name))
+
+	return s.agentRepo.UpdateById(ctx, &agent)
+}
+
+// CheckAndResetTraffic 检查并重置所有到期的探针流量(定时任务调用)
+func (s *TrafficService) CheckAndResetTraffic(ctx context.Context) error {
+	agents, err := s.agentRepo.FindAgentsWithTrafficReset(ctx)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now()
+	resetCount := 0
+
+	for _, agent := range agents {
+		if s.shouldResetTraffic(&agent, now) {
+			if err := s.ResetAgentTraffic(ctx, agent.ID); err != nil {
+				s.logger.Error("重置探针流量失败",
+					zap.String("agentId", agent.ID),
+					zap.Error(err))
+				continue
+			}
+			resetCount++
+		}
+	}
+
+	if resetCount > 0 {
+		s.logger.Info("流量重置检查完成", zap.Int("重置数量", resetCount))
+	}
+
+	return nil
+}
+
+// shouldResetTraffic 判断是否需要重置流量
+func (s *TrafficService) shouldResetTraffic(agent *models.Agent, now time.Time) bool {
+	stats := agent.TrafficStats.Data()
+	// 流量统计未启用、未配置重置日期或周期未开始时不重置
+	if !stats.Enabled || stats.ResetDay == 0 || stats.PeriodStart == 0 {
+		return false
+	}
+
+	periodStart := time.UnixMilli(stats.PeriodStart)
+	nextReset := calculateNextResetDate(periodStart, stats.ResetDay)
+
+	return now.After(nextReset) || now.Equal(nextReset)
+}
+
+// calculateNextResetDate 计算下次重置日期
+func calculateNextResetDate(periodStart time.Time, resetDay int) time.Time {
+	year, month, day := periodStart.Date()
+	location := periodStart.Location()
+
+	// 先计算当月的重置日期
+	currentMonthLastDay := time.Date(year, month+1, 0, 0, 0, 0, 0, location).Day()
+	currentMonthResetDay := resetDay
+	if resetDay > currentMonthLastDay {
+		currentMonthResetDay = currentMonthLastDay
+	}
+	currentMonthReset := time.Date(year, month, currentMonthResetDay, 0, 0, 0, 0, location)
+
+	// 如果当月的重置日期还没到（在 periodStart 之后或同一天），返回当月重置日期
+	if day < currentMonthResetDay || (day == currentMonthResetDay && periodStart.Before(currentMonthReset)) {
+		return currentMonthReset
+	}
+
+	// 当月重置日期已过，计算下个月的重置日期
+	nextMonth := month + 1
+	nextYear := year
+	if nextMonth > 12 {
+		nextMonth = 1
+		nextYear++
+	}
+
+	// 处理月末日期(如2月没有31号)
+	nextMonthLastDay := time.Date(nextYear, nextMonth+1, 0, 0, 0, 0, 0, location).Day()
+	nextMonthResetDay := resetDay
+	if resetDay > nextMonthLastDay {
+		nextMonthResetDay = nextMonthLastDay
+	}
+
+	return time.Date(nextYear, nextMonth, nextMonthResetDay, 0, 0, 0, 0, location)
+}
+
+// TrafficStats 流量统计信息
+type TrafficStats struct {
+	Enabled        bool          `json:"enabled"`
+	Type           string        `json:"type"` // 统计类型: recv/send/both
+	Limit          uint64        `json:"limit"`
+	Used           uint64        `json:"used"`
+	UsedPercent    float64       `json:"usedPercent"`
+	Remaining      uint64        `json:"remaining"`
+	ResetDay       int           `json:"resetDay"`
+	PeriodStart    int64         `json:"periodStart"`
+	PeriodEnd      int64         `json:"periodEnd"`
+	DaysUntilReset int           `json:"daysUntilReset"`
+	Alerts         TrafficAlerts `json:"alerts"`
+}
+
+// TrafficAlerts 流量告警状态
+type TrafficAlerts struct {
+	Sent80  bool `json:"sent80"`
+	Sent90  bool `json:"sent90"`
+	Sent100 bool `json:"sent100"`
 }

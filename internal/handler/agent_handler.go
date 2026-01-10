@@ -10,6 +10,7 @@ import (
 type AgentHandler struct {
 	logger          *zap.Logger
 	agentService    *service.AgentService
+	trafficService  *service.TrafficService
 	metricService   *service.MetricService
 	monitorSvc      *service.MonitorService
 	tamperService   *service.TamperService
@@ -19,13 +20,14 @@ type AgentHandler struct {
 	upgrader        websocket.Upgrader
 }
 
-func NewAgentHandler(logger *zap.Logger, agentService *service.AgentService, metricService *service.MetricService,
-	monitorService *service.MonitorService, tamperService *service.TamperService, ddnsService *service.DDNSService,
-	sshLoginService *service.SSHLoginService, wsManager *ws.Manager) *AgentHandler {
+func NewAgentHandler(logger *zap.Logger, agentService *service.AgentService, trafficService *service.TrafficService,
+	metricService *service.MetricService, monitorService *service.MonitorService, tamperService *service.TamperService,
+	ddnsService *service.DDNSService, sshLoginService *service.SSHLoginService, wsManager *ws.Manager) *AgentHandler {
 
 	h := &AgentHandler{
 		logger:          logger,
 		agentService:    agentService,
+		trafficService:  trafficService,
 		metricService:   metricService,
 		monitorSvc:      monitorService,
 		tamperService:   tamperService,

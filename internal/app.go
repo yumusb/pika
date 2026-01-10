@@ -445,7 +445,7 @@ func startTrafficResetCheck(ctx context.Context, components *AppComponents, logg
 			logger.Info("流量重置检查任务已停止")
 			return
 		case <-ticker.C:
-			if err := components.AgentService.CheckAndResetTraffic(ctx); err != nil {
+			if err := components.TrafficService.CheckAndResetTraffic(ctx); err != nil {
 				logger.Error("流量重置检查失败", zap.Error(err))
 			}
 		}

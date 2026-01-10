@@ -119,7 +119,7 @@ const AgentDetail = () => {
                     <Descriptions.Item label="探针名称">{agent?.name}</Descriptions.Item>
                     <Descriptions.Item label="探针ID">{agent?.id}</Descriptions.Item>
                     <Descriptions.Item label="主机名">{agent?.hostname}</Descriptions.Item>
-                    <Descriptions.Item label="IP地址">{agent?.ip}</Descriptions.Item>
+                    <Descriptions.Item label="通信IP">{agent?.ip}</Descriptions.Item>
                     <Descriptions.Item label="操作系统">
                         <Tag color="blue">{agent?.os}</Tag>
                     </Descriptions.Item>

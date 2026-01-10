@@ -16,6 +16,7 @@ const TrafficStats: React.FC<TrafficStatsProps> = ({agentId}) => {
     const [form] = Form.useForm();
     const queryClient = useQueryClient();
     const [enabled, setEnabled] = useState(false);
+    const [editingUsed, setEditingUsed] = useState(false);
 
     // 获取流量统计
     const {data: stats, isLoading} = useQuery<TrafficStatsType>({
@@ -32,14 +33,18 @@ const TrafficStats: React.FC<TrafficStatsProps> = ({agentId}) => {
         mutationFn: async () => {
             const values = form.getFieldsValue();
             const limitBytes = enabled ? (values.trafficLimit || 0) * 1024 * 1024 * 1024 : 0;
+            const usedBytes = editingUsed && values.trafficUsed ? values.trafficUsed * 1024 * 1024 * 1024 : 0;
             return updateTrafficConfig(agentId, {
                 enabled: enabled,
+                type: values.trafficType || 'recv',
                 limit: limitBytes,
+                used: usedBytes,
                 resetDay: enabled ? (values.trafficResetDay || 0) : 0,
             });
         },
         onSuccess: () => {
             message.success('配置已保存');
+            setEditingUsed(false);
             queryClient.invalidateQueries({queryKey: ['trafficStats', agentId]});
         },
         onError: (error: unknown) => {
@@ -80,13 +85,17 @@ const TrafficStats: React.FC<TrafficStatsProps> = ({agentId}) => {
             // 从服务器返回的 enabled 字段读取启用状态
             setEnabled(stats.enabled);
             form.setFieldsValue({
+                trafficType: stats.type || 'recv',
                 trafficLimit: stats.limit > 0 ? stats.limit / (1024 * 1024 * 1024) : 0,
+                trafficUsed: stats.used > 0 ? stats.used / (1024 * 1024 * 1024) : 0,
                 trafficResetDay: stats.resetDay || 0,
             });
         } else {
             setEnabled(false);
             form.setFieldsValue({
+                trafficType: 'recv',
                 trafficLimit: 0,
+                trafficUsed: 0,
                 trafficResetDay: 0,
             });
         }
@@ -217,7 +226,9 @@ const TrafficStats: React.FC<TrafficStatsProps> = ({agentId}) => {
                     form={form}
                     layout="vertical"
                     initialValues={{
+                        trafficType: 'recv',
                         trafficLimit: 0,
+                        trafficUsed: 0,
                         trafficResetDay: 0,
                     }}
                 >
@@ -236,6 +247,22 @@ const TrafficStats: React.FC<TrafficStatsProps> = ({agentId}) => {
                     {enabled && (
                         <>
                             <Form.Item
+                                label="统计类型"
+                                name="trafficType"
+                                rules={[{required: true, message: '请选择统计类型'}]}
+                                extra="选择要统计的流量类型"
+                            >
+                                <Select
+                                    placeholder="请选择统计类型"
+                                    options={[
+                                        {label: '进站流量 (下载)', value: 'recv'},
+                                        {label: '出站流量 (上传)', value: 'send'},
+                                        {label: '全部流量 (上传+下载)', value: 'both'},
+                                    ]}
+                                />
+                            </Form.Item>
+
+                            <Form.Item
                                 label="流量限额"
                                 name="trafficLimit"
                                 rules={[{required: true, message: '请输入流量限额'}]}
@@ -248,6 +275,33 @@ const TrafficStats: React.FC<TrafficStatsProps> = ({agentId}) => {
                                     placeholder="请输入流量限额(GB)"
                                     style={{width: '100%'}}
                                     addonAfter="GB"
+                                />
+                            </Form.Item>
+
+                            <Form.Item
+                                label={
+                                    <div className="flex items-center gap-2">
+                                        <span>已使用流量</span>
+                                        <Switch
+                                            size="small"
+                                            checked={editingUsed}
+                                            onChange={setEditingUsed}
+                                            checkedChildren="编辑中"
+                                            unCheckedChildren="锁定"
+                                        />
+                                    </div>
+                                }
+                                name="trafficUsed"
+                                extra={editingUsed ? "手动设置已使用的流量大小(GB)" : "当前已使用的流量（只读）"}
+                            >
+                                <InputNumber
+                                    min={0}
+                                    step={0.1}
+                                    precision={2}
+                                    placeholder="已使用流量(GB)"
+                                    style={{width: '100%'}}
+                                    addonAfter="GB"
+                                    disabled={!editingUsed}
                                 />
                             </Form.Item>
 
