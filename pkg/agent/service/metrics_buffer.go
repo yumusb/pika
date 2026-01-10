@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/boltdb/bolt"
 	"github.com/dushixiang/pika/internal/protocol"
 	"github.com/dushixiang/pika/pkg/agent/collector"
 	"github.com/dushixiang/pika/pkg/agent/utils"
+	bolt "go.etcd.io/bbolt"
 )
 
 const (

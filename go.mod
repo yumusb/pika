@@ -3,7 +3,6 @@ module github.com/dushixiang/pika
 go 1.25.5
 
 require (
-	github.com/boltdb/bolt v1.3.1
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-errors/errors v1.5.1
@@ -34,6 +33,7 @@ require (
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/valyala/fasttemplate v1.2.2
+	go.etcd.io/bbolt v1.4.3
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.46.0
 	golang.org/x/oauth2 v0.34.0
