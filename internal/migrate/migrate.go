@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dushixiang/pika/internal/migrate/v0_1_1"
+	"github.com/dushixiang/pika/internal/migrate/v0_1_2"
 	"github.com/dushixiang/pika/internal/service"
 	"github.com/dushixiang/pika/pkg/version"
 	"go.uber.org/zap"
@@ -20,6 +21,12 @@ func AutoMigrate(logger *zap.Logger, db *gorm.DB, propertyService *service.Prope
 	}
 	if strings.Compare(localVersion, "v0.1.0") < 0 {
 		if err := v0_1_1.Migrate(logger, db); err != nil {
+			return err
+		}
+	}
+	// 升级到 v0.1.2 版本
+	if strings.Compare(localVersion, "v0.1.2") < 0 {
+		if err := v0_1_2.Migrate(logger, db); err != nil {
 			return err
 		}
 	}
