@@ -297,6 +297,16 @@ const AgentList = () => {
             width: 150,
         },
         {
+            title: '通信地址',
+            dataIndex: 'ip',
+            key: 'ip',
+            ellipsis: true,
+            width: 160,
+            render: (value) => (
+                <span className="font-mono text-xs">{value || '-'}</span>
+            ),
+        },
+        {
             title: 'IPv4',
             dataIndex: 'ipv4',
             key: 'ipv4',
